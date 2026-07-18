@@ -4,7 +4,8 @@ export async function GET() {
     check('https://api.openai.com/v1/models', {
       Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
     }, !!process.env.OPENAI_API_KEY),
-    check('https://api.elevenlabs.io/v1/user', {
+    // /v1/models works with scope-restricted keys; /v1/user needs user_read
+    check('https://api.elevenlabs.io/v1/models', {
       'xi-api-key': process.env.ELEVENLABS_API_KEY ?? '',
     }, !!process.env.ELEVENLABS_API_KEY),
   ]);
