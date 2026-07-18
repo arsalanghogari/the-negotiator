@@ -5,7 +5,12 @@ export default function Home() {
       <p className="text-muted-foreground">
         Same move, $1,158–$6,506. An AI agent that calls, compares, and negotiates for you.
       </p>
-      <p className="text-sm text-muted-foreground">M0 scaffold — intake coming next.</p>
+      <a
+        href="/intake"
+        className="rounded-md bg-foreground px-6 py-2 font-medium text-background hover:opacity-90"
+      >
+        Start intake
+      </a>
     </main>
   );
 }
