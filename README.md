@@ -1,2 +1,1 @@
-# the-negotiator
-Hack-Nation Hackathon
+Hack-Nation Hackathon App
