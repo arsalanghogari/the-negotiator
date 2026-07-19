@@ -4,9 +4,10 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import type { Quote, Report, Transcript } from '@/types';
+import { Input } from '@/components/ui/input';
+import type { InvoiceRequest, JobSpec, Quote, Report, Transcript } from '@/types';
 
-type Bundle = { report: Report | null; transcripts: Transcript[] };
+type Bundle = { report: Report | null; transcripts: Transcript[]; spec: JobSpec };
 
 export default function ReportPage() {
   const [data, setData] = useState<Bundle | null>(null);
@@ -63,6 +64,23 @@ export default function ReportPage() {
               )}
             </div>
           </div>
+
+          <Card>
+            <CardHeader><CardTitle className="text-lg">Why this pick</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              <p className="whitespace-pre-wrap text-sm leading-relaxed">{report.rationale}</p>
+              {report.redFlags.length > 0 && (
+                <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm dark:border-red-900 dark:bg-red-950">
+                  <p className="font-medium text-red-600">Red flags</p>
+                  <ul className="mt-1 list-disc pl-5 text-red-600/90">
+                    {report.redFlags.map((f, i) => <li key={i}>{f}</li>)}
+                  </ul>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <TakeAction report={report} defaultEmail={data?.spec.contactEmail ?? ''} />
 
           <div className="space-y-4">
             {report.ranked.map((q, i) => (
@@ -121,22 +139,85 @@ export default function ReportPage() {
             ))}
           </div>
 
-          <Card>
-            <CardHeader><CardTitle className="text-lg">Why this pick</CardTitle></CardHeader>
-            <CardContent className="space-y-3">
-              <p className="whitespace-pre-wrap text-sm leading-relaxed">{report.rationale}</p>
-              {report.redFlags.length > 0 && (
-                <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm dark:border-red-900 dark:bg-red-950">
-                  <p className="font-medium text-red-600">Red flags</p>
-                  <ul className="mt-1 list-disc pl-5 text-red-600/90">
-                    {report.redFlags.map((f, i) => <li key={i}>{f}</li>)}
-                  </ul>
-                </div>
-              )}
-            </CardContent>
-          </Card>
         </>
       )}
     </main>
+  );
+}
+
+function TakeAction({ report, defaultEmail }: { report: Report; defaultEmail: string }) {
+  const quotable = report.ranked.filter((q) => q.callOutcome === 'quoted');
+  const [quoteId, setQuoteId] = useState(report.recommendedQuoteId);
+  const [email, setEmail] = useState(defaultEmail);
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<InvoiceRequest | null>(null);
+  const [error, setError] = useState('');
+
+  async function go() {
+    setBusy(true);
+    setError('');
+    setResult(null);
+    try {
+      const res = await fetch('/api/take-action', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ quoteId, email }),
+      });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error ?? `HTTP ${res.status}`);
+      setResult(j);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader><CardTitle className="text-lg">Take action</CardTitle></CardHeader>
+      <CardContent className="space-y-3">
+        <p className="text-sm text-muted-foreground">
+          Book the move: the negotiator calls the seller back and asks for an itemized invoice by email.
+          {/* ponytail: DEMO_MODE — the seller is simulated, so no real email is sent. */}
+        </p>
+        <div className="flex flex-wrap items-center gap-3">
+          <select
+            className="h-9 rounded-md border bg-transparent px-2 text-sm"
+            value={quoteId}
+            onChange={(e) => { setQuoteId(e.target.value); setResult(null); }}
+          >
+            {quotable.map((q) => (
+              <option key={q.quoteId} value={q.quoteId}>
+                {q.providerName} — ${q.totalPrice.toLocaleString()}{q.quoteId === report.recommendedQuoteId ? ' (recommended)' : ''}
+              </option>
+            ))}
+          </select>
+          <Input
+            type="email"
+            placeholder="you@example.com"
+            className="w-64"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+          <Button onClick={go} disabled={busy || !email.includes('@')}>
+            {busy ? 'Calling seller…' : 'Request invoice'}
+          </Button>
+        </div>
+        {error && <p className="text-sm text-red-500">{error}</p>}
+        {result && (
+          <div className="space-y-2 rounded-md border p-3 text-sm">
+            <p className="font-medium text-indigo-600">
+              Invoice requested from {result.providerName} → {result.email}
+            </p>
+            {result.turns.map((t, i) => (
+              <p key={i}>
+                <span className="font-semibold">{t.speaker === 'negotiator' ? 'Negotiator' : 'Seller'}:</span> {t.text}
+              </p>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

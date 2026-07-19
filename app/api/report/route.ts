@@ -73,10 +73,13 @@ export async function POST() {
   });
   const out = JSON.parse(res.choices[0].message.content ?? '{}');
 
-  // Rank by true total cost — deterministic, so it's code, not model judgment.
+  // Rank by desirability (deviation from spec's cost-sort, per user): recommended first,
+  // red-flagged last, price breaks ties. Deterministic, so it's code, not model judgment.
+  const rank = (q: Quote) =>
+    (q.quoteId === out.recommendedQuoteId ? 0 : 1_000_000) + (q.redFlag ? 2_000_000 : 0) + q.totalPrice;
   const report: Report = {
     jobId: spec.jobId,
-    ranked: [...quotes].sort((a, b) => a.totalPrice - b.totalPrice),
+    ranked: [...quotes].sort((a, b) => rank(a) - rank(b)),
     recommendedQuoteId: out.recommendedQuoteId,
     rationale: out.rationale,
     redFlags: out.redFlags,

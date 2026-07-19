@@ -72,6 +72,23 @@ export async function runCall(
   };
 }
 
+// Short follow-up call: accept the quote and ask for an itemized invoice by email.
+export async function requestInvoiceCall(spec: JobSpec, quote: Quote, email: string): Promise<TranscriptTurn[]> {
+  const seller = vertical.sellers.find((s) => s.persona === quote.persona);
+  if (!seller) throw new Error(`unknown persona ${quote.persona}`);
+  const context = `${seller.systemPrompt}\nEarlier today you quoted this caller $${quote.totalPrice}${quote.binding ? ' (binding)' : ''} for their move, and you have all the job details on file. They are calling back to accept. Do not ask any questions — happily confirm the booking and that you will email the itemized invoice to the address they give, repeating the address back.`;
+  const turns: TranscriptTurn[] = [
+    {
+      speaker: 'negotiator',
+      text: `Hi, I'm calling back about the move we discussed — we'd like to go ahead with your quote of $${quote.totalPrice.toLocaleString()}. Could you email an itemized invoice to ${email}?`,
+    },
+  ];
+  const sel = await chat(context, turns, 'seller');
+  turns.push({ speaker: 'seller', text: (sel.choices[0].message.content ?? '').trim() });
+  turns.push({ speaker: 'negotiator', text: 'Perfect, thank you. We look forward to the invoice and to moving day. Goodbye!' });
+  return turns;
+}
+
 const quoteSchema = {
   type: 'object',
   properties: {

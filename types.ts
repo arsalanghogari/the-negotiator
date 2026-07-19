@@ -16,7 +16,17 @@ export interface JobSpec {
   packingService: boolean;
   preferredDate: string; // YYYY-MM-DD
   specialNotes: string;
+  contactEmail: string; // where the winning seller should send the invoice
   confirmedByUser: boolean;
+}
+
+export interface InvoiceRequest {
+  jobId: string;
+  quoteId: string;
+  providerName: string;
+  email: string;
+  turns: TranscriptTurn[]; // the follow-up call
+  status: 'requested';
 }
 
 export interface LineItem {

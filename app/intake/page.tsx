@@ -23,6 +23,7 @@ const empty: JobSpec = {
   packingService: false,
   preferredDate: '',
   specialNotes: '',
+  contactEmail: '',
   confirmedByUser: false,
 };
 
@@ -177,9 +178,15 @@ export default function IntakePage() {
             </label>
           </div>
 
-          <div className="space-y-1">
-            <Label>Special notes</Label>
-            <Input value={spec.specialNotes} onChange={(e) => set({ specialNotes: e.target.value })} />
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label>Special notes</Label>
+              <Input value={spec.specialNotes} onChange={(e) => set({ specialNotes: e.target.value })} />
+            </div>
+            <div className="space-y-1">
+              <Label>Email (for the winning seller&apos;s invoice)</Label>
+              <Input type="email" value={spec.contactEmail} onChange={(e) => set({ contactEmail: e.target.value })} />
+            </div>
           </div>
 
           <div className="flex items-center gap-4">
