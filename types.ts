@@ -45,6 +45,7 @@ export interface Quote {
   binding: boolean;
   redFlag: boolean; // true if totalPrice >= 30% below market median
   redFlagReason: string | null;
+  itemizationMismatch: boolean; // base + fees don't sum to the stated total
   negotiated: boolean; // true if price moved during the call
   priceBefore: number | null;
   priceAfter: number | null;

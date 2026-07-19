@@ -169,10 +169,19 @@ export async function extractQuote(transcript: Transcript): Promise<Quote> {
   // Deterministic guards: these rules are code, not model judgment.
   // A negotiated price means the final total IS the negotiated price.
   if (ex.negotiated && ex.priceAfter != null) ex.totalPrice = ex.priceAfter;
+
+  // Itemization must reconcile: base + fees = stated total (pre-negotiation total when a
+  // drop happened, since sellers don't re-itemize after conceding). Unknown fee amounts
+  // make it unverifiable, not mismatched.
+  const amounts = (ex.lineItems as { amount: number | null }[]).map((li) => li.amount);
+  const feeSum = amounts.every((a) => a != null) ? amounts.reduce((s, a) => s! + a!, 0) : null;
+  const statedTotal = ex.negotiated && ex.priceBefore != null ? ex.priceBefore : ex.totalPrice;
+  const itemizationMismatch = feeSum != null && ex.basePrice + feeSum !== statedTotal;
   const threshold = vertical.marketMedian * (1 - vertical.redFlagBelowMedianPct);
   const redFlag = ex.totalPrice > 0 && ex.totalPrice <= threshold;
   return {
     ...ex,
+    itemizationMismatch,
     quoteId: `q-${transcript.jobId}-${transcript.persona}`,
     providerName: transcript.providerName,
     persona: transcript.persona,

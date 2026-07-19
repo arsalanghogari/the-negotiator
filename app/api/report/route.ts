@@ -6,7 +6,7 @@ import type { JobSpec, Quote, Report, Transcript } from '@/types';
 export const maxDuration = 120;
 
 const RANKING_PROMPT =
-  "You are advising a customer choosing a mover. Given the confirmed job spec and all structured quotes with transcripts, recommend one quote and explain in plain language why — citing specific fees and quoting short transcript moments. Flag any too-cheap (red-flag) quotes and why they're risky. Note where a price was negotiated down. Be concrete and honest.";
+  "You are advising a customer choosing a mover. Given the confirmed job spec and all structured quotes with transcripts, recommend one quote and explain in plain language why — citing specific fees and quoting short transcript moments. Flag any too-cheap (red-flag) quotes and why they're risky. Any quote with itemizationMismatch=true has line items that do not sum to its stated total — treat that as a transparency risk and address it explicitly in the rationale. Note where a price was negotiated down. Be concrete and honest.";
 
 async function bundle() {
   const specs = await readAll<JobSpec>('jobspecs');

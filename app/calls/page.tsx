@@ -285,6 +285,7 @@ export default function CallsPage() {
                         )}
                         {c.quote.binding && <Badge variant="outline">binding</Badge>}
                         {c.quote.redFlag && <Badge variant="destructive">red flag</Badge>}
+                        {c.quote.itemizationMismatch && <Badge variant="destructive">doesn&apos;t add up</Badge>}
                       </span>
                     </div>
                     {c.quote.lineItems.map((li, i) => (

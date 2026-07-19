@@ -82,6 +82,8 @@ export default function ReportPage() {
 
           <TakeAction report={report} defaultEmail={data?.spec.contactEmail ?? ''} />
 
+          <AskAnything />
+
           <div className="space-y-4">
             {report.ranked.map((q, i) => (
               <Card key={q.quoteId} className={q.quoteId === report.recommendedQuoteId ? 'border-indigo-600' : ''}>
@@ -106,6 +108,7 @@ export default function ReportPage() {
                     {q.binding ? <Badge variant="outline">binding</Badge> : <Badge variant="secondary">non-binding</Badge>}
                     {q.negotiated && <Badge className="bg-indigo-600">price dropped on call</Badge>}
                     {q.redFlag && <Badge variant="destructive">red flag</Badge>}
+                    {q.itemizationMismatch && <Badge variant="destructive">itemization doesn&apos;t add up</Badge>}
                     <Badge variant="secondary">{q.callOutcome}</Badge>
                   </div>
                   {q.redFlag && q.redFlagReason && <p className="text-sm text-red-600">{q.redFlagReason}</p>}
@@ -142,6 +145,71 @@ export default function ReportPage() {
         </>
       )}
     </main>
+  );
+}
+
+type ChatMsg = { role: 'user' | 'assistant'; content: string };
+
+function AskAnything() {
+  const [messages, setMessages] = useState<ChatMsg[]>([]);
+  const [input, setInput] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  async function send() {
+    const q = input.trim();
+    if (!q || busy) return;
+    const next: ChatMsg[] = [...messages, { role: 'user', content: q }];
+    setMessages(next);
+    setInput('');
+    setBusy(true);
+    try {
+      const res = await fetch('/api/ask', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ messages: next }),
+      });
+      const j = await res.json();
+      setMessages([...next, { role: 'assistant', content: res.ok ? j.text : `Error: ${j.error}` }]);
+    } catch (e) {
+      setMessages([...next, { role: 'assistant', content: `Error: ${e}` }]);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader><CardTitle className="text-lg">Questions about these quotes?</CardTitle></CardHeader>
+      <CardContent className="space-y-3">
+        {messages.length === 0 && (
+          <p className="text-sm text-muted-foreground">
+            Ask anything grounded in your calls — e.g. &ldquo;why is the cheapest quote risky?&rdquo; or
+            &ldquo;what did Golden Gate say about insurance?&rdquo;
+          </p>
+        )}
+        {messages.length > 0 && (
+          <div className="max-h-72 space-y-3 overflow-y-auto rounded-md border p-3 text-sm">
+            {messages.map((m, i) => (
+              <p key={i} className={m.role === 'user' ? 'font-medium' : 'text-muted-foreground'}>
+                <span className="font-semibold">{m.role === 'user' ? 'You: ' : 'Negotiator: '}</span>
+                {m.content}
+              </p>
+            ))}
+            {busy && <p className="text-muted-foreground">Thinking…</p>}
+          </div>
+        )}
+        <div className="flex gap-2">
+          <Input
+            placeholder="Ask a question about your quotes…"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && send()}
+            disabled={busy}
+          />
+          <Button onClick={send} disabled={busy || !input.trim()}>Ask</Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
