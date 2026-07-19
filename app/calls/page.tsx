@@ -30,10 +30,12 @@ function ShowcaseCall({
   auto = false,
   onSaved,
   onResult,
+  onTurns,
 }: {
   auto?: boolean;
   onSaved?: () => void;
   onResult?: (turns: TranscriptTurn[], quote: Quote) => void;
+  onTurns?: (turns: TranscriptTurn[]) => void; // live mirror into the seller card
 }) {
   const [turns, setTurns] = useState<TranscriptTurn[]>([]);
   const [phase, setPhase] = useState<'idle' | 'live' | 'saving' | 'done'>('idle');
@@ -48,12 +50,15 @@ function ShowcaseCall({
   // render's props — where onSaved was still undefined. Refs always point at the latest.
   const onSavedRef = useRef(onSaved);
   const onResultRef = useRef(onResult);
+  const onTurnsRef = useRef(onTurns);
   onSavedRef.current = onSaved;
   onResultRef.current = onResult;
+  onTurnsRef.current = onTurns;
   const gate = useSpeechGate();
   const push = (t: TranscriptTurn) => {
     turnsRef.current = [...turnsRef.current, t];
     setTurns(turnsRef.current);
+    onTurnsRef.current?.(turnsRef.current);
   };
 
   // Listen-in: the seller's reply is spoken aloud (TTS) BEFORE the text goes to the agent,
@@ -257,6 +262,7 @@ export default function CallsPage() {
   const [error, setError] = useState('');
   const [demoStep, setDemoStep] = useState('');
   const [voiceAuto, setVoiceAuto] = useState(false);
+  const [generating, setGenerating] = useState(false);
   const scrollRefs = useRef<Partial<Record<Persona, HTMLDivElement | null>>>({});
 
   // Run-demo flow: /calls?demo=1 auto-runs the calls, then generates the report and moves on.
@@ -283,6 +289,18 @@ export default function CallsPage() {
     if (!res.ok) {
       setError(await res.text());
       return setDemoStep('');
+    }
+    window.location.href = '/report';
+  }
+
+  // Manual path: generate the report from whatever calls are done, then move on.
+  async function goReport() {
+    setGenerating(true);
+    setError('');
+    const res = await fetch('/api/report', { method: 'POST' });
+    if (!res.ok) {
+      setError(await res.text());
+      return setGenerating(false);
     }
     window.location.href = '/report';
   }
@@ -340,7 +358,11 @@ export default function CallsPage() {
         <h1 className="text-3xl font-bold tracking-tight">Calls</h1>
         <span className="flex items-center gap-3">
           {demoStep && <span className="text-sm font-medium text-signal-deep">{demoStep}</span>}
-          <Button onClick={() => run()} disabled={running}>{running ? 'Calling…' : `Run ${SELLERS.length} calls`}</Button>
+          {/* Bay Area Van Lines always runs as the live listen-in call — never as text,
+              so the card and the listen-in transcript can't diverge. */}
+          <Button onClick={() => run('tough')} disabled={running}>
+            {running ? 'Calling…' : `Run ${SELLERS.length - 1} text calls`}
+          </Button>
         </span>
       </div>
       {error && <p className="text-sm text-red-500">{error}</p>}
@@ -382,13 +404,16 @@ export default function CallsPage() {
         <ShowcaseCall
           auto={voiceAuto}
           onSaved={voiceAuto ? onVoiceDone : undefined}
+          onTurns={(turns) =>
+            setCalls((c) => ({ ...c, tough: { ...c.tough, status: 'calling', turns } }))
+          }
           onResult={(turns, quote) =>
             setCalls((c) => ({ ...c, tough: { status: 'done', turns, quote } }))
           }
         />
       </ConversationProvider>
 
-      <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {SELLERS.map(({ persona, name }) => {
           const c = calls[persona];
           return (
@@ -406,7 +431,13 @@ export default function CallsPage() {
                   ref={(el) => { scrollRefs.current[persona] = el; }}
                   className="h-64 space-y-2 overflow-y-auto rounded-md border p-3 text-xs"
                 >
-                  {c.turns.length === 0 && <p className="text-muted-foreground">No call yet.</p>}
+                  {c.turns.length === 0 && (
+                    <p className="text-muted-foreground">
+                      {persona === 'tough'
+                        ? 'This one runs as the live listen-in call above — start it to watch the transcript here.'
+                        : 'No call yet.'}
+                    </p>
+                  )}
                   {c.turns.map((t, i) => (
                     <p key={i}>
                       <span className={t.speaker === 'negotiator' ? 'font-semibold' : 'font-semibold text-muted-foreground'}>
@@ -419,13 +450,13 @@ export default function CallsPage() {
 
                 {c.quote && (
                   <div className="space-y-1 rounded-md border p-3 text-sm">
-                    <div className="flex items-center justify-between font-semibold">
+                    <div className="flex items-start justify-between gap-2 font-semibold">
                       <span className={c.quote.callOutcome === 'quoted' ? 'font-mono' : ''}>
                         {c.quote.callOutcome === 'quoted'
                           ? `$${c.quote.totalPrice.toLocaleString()}`
                           : 'no price given'}
                       </span>
-                      <span className="flex gap-1">
+                      <span className="flex flex-wrap justify-end gap-1">
                         {c.quote.negotiated && c.quote.priceBefore != null && (
                           <Badge className="font-mono">${c.quote.priceBefore.toLocaleString()} → ${c.quote.priceAfter?.toLocaleString()}</Badge>
                         )}
@@ -448,6 +479,17 @@ export default function CallsPage() {
           );
         })}
       </div>
+
+      {Object.values(calls).some((c) => c.quote) && !demoStep && (
+        <div className="flex items-center justify-end gap-3">
+          <span className="text-sm text-muted-foreground">
+            Done calling? Rank the quotes and get the recommendation.
+          </span>
+          <Button onClick={goReport} disabled={generating || running}>
+            {generating ? 'Generating report…' : 'Generate the ranked report →'}
+          </Button>
+        </div>
+      )}
     </main>
   );
 }
