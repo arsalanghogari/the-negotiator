@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ConversationProvider, useConversation } from '@elevenlabs/react';
 import { useSpeechGate } from '@/lib/use-speech-gate';
+import { stripDirections } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -273,7 +274,7 @@ function VoiceIntakeInner({ demo, onSpec }: { demo: boolean; onSpec: (spec: Part
     },
     onModeChange: gate.onModeChange,
     onMessage: async ({ source, message }: { source: string; message: string }) => {
-      addTurn({ source, message });
+      addTurn({ source, message: stripDirections(message) });
       if (!demo || source !== 'ai' || !message || doneRef.current) return;
       gate.noteAgentMessage();
       try {

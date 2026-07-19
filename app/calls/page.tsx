@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ConversationProvider, useConversation } from '@elevenlabs/react';
 import { useSpeechGate } from '@/lib/use-speech-gate';
+import { stripDirections } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -20,10 +21,6 @@ type CallState = {
 const idle = (): CallState => ({ status: 'idle', turns: [], quote: null });
 const idleAll = () =>
   Object.fromEntries(SELLERS.map((s) => [s.persona, idle()])) as Record<Persona, CallState>;
-
-// Agents sometimes emit stage directions like "[Confidently]" despite the prompt — never
-// display or speak them.
-const stripDirections = (t: string) => t.replace(/\[[^\]]{0,60}\]\s*/g, '').trim();
 
 // The listen-in call: the ElevenLabs negotiator agent speaks out loud; the simulated
 // "tough" seller replies are generated server-side, spoken via TTS, then fed in as text.
