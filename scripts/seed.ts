@@ -17,6 +17,7 @@ const jobSpec: JobSpec = {
   packingService: false,
   preferredDate: '2026-08-01',
   specialNotes: 'Piano needs padding; street parking only at origin.',
+  customerName: 'Alex Rivera',
   contactEmail: 'demo@thenegotiator.app',
   confirmedByUser: true,
 };

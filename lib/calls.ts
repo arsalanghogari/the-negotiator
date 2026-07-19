@@ -8,6 +8,8 @@ const MAX_NEGOTIATOR_TURNS = 16; // drip-fed details + dispatcher questions need
 
 type SellerCfg = (typeof vertical.sellers)[number];
 
+const SPOKEN_SIZE = { studio: 'studio', '1br': 'one-bedroom', '2br': 'two-bedroom', '3br+': 'three-plus-bedroom' } as const;
+
 function chat(system: string, turns: TranscriptTurn[], speakAs: 'negotiator' | 'seller') {
   return openai.chat.completions.create({
     model: MODEL,
@@ -40,7 +42,7 @@ export async function runCall(
   const spokenDate = new Date(`${spec.preferredDate}T00:00:00`).toLocaleDateString('en-US', {
     month: 'long', day: 'numeric', year: 'numeric',
   });
-  const spokenSize = { studio: 'studio', '1br': 'one-bedroom', '2br': 'two-bedroom', '3br+': 'three-plus-bedroom' }[spec.homeSize];
+  const spokenSize = SPOKEN_SIZE[spec.homeSize];
   const opener: TranscriptTurn = {
     speaker: 'negotiator',
     text: `Hi, I'm calling to get a quote for a move on ${spokenDate}: a ${spokenSize} from ${spec.origin.city} to ${spec.destination.city}. Could you help me with that?`,
@@ -80,7 +82,7 @@ export async function requestInvoiceCall(spec: JobSpec, quote: Quote, email: str
   const turns: TranscriptTurn[] = [
     {
       speaker: 'negotiator',
-      text: `Hi, I'm calling back about the move we discussed — we'd like to go ahead with your quote of $${quote.totalPrice.toLocaleString()}. Could you email an itemized invoice to ${email}?`,
+      text: `Hi, I'm calling back about the ${SPOKEN_SIZE[spec.homeSize]} move from ${spec.origin.city} to ${spec.destination.city} we discussed — the booking is for ${spec.customerName || 'my client'}, and we'd like to go ahead with your quote of $${quote.totalPrice.toLocaleString()}. Could you email the itemized invoice to ${email}?`,
     },
   ];
   const sel = await chat(context, turns, 'seller');

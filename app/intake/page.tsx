@@ -23,6 +23,7 @@ const empty: JobSpec = {
   packingService: false,
   preferredDate: '',
   specialNotes: '',
+  customerName: '',
   contactEmail: '',
   confirmedByUser: false,
 };
@@ -182,6 +183,10 @@ export default function IntakePage() {
             <div className="space-y-1">
               <Label>Special notes</Label>
               <Input value={spec.specialNotes} onChange={(e) => set({ specialNotes: e.target.value })} />
+            </div>
+            <div className="space-y-1">
+              <Label>Your name (for the booking)</Label>
+              <Input value={spec.customerName} onChange={(e) => set({ customerName: e.target.value })} />
             </div>
             <div className="space-y-1">
               <Label>Email (for the winning seller&apos;s invoice)</Label>

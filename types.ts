@@ -16,6 +16,7 @@ export interface JobSpec {
   packingService: boolean;
   preferredDate: string; // YYYY-MM-DD
   specialNotes: string;
+  customerName: string; // spoken only at booking time, never during shopping calls
   contactEmail: string; // where the winning seller should send the invoice
   confirmedByUser: boolean;
 }
