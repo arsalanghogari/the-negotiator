@@ -241,6 +241,10 @@ function VoiceIntakeInner({ demo, onSpec }: { demo: boolean; onSpec: (spec: Part
   const [turns, setTurns] = useState<{ source: string; message: string }[]>([]);
   const [error, setError] = useState('');
   const gate = useSpeechGate();
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
+  }, [turns]);
   const turnsLive = useRef<{ source: string; message: string }[]>([]);
   const addTurn = (t: { source: string; message: string }) => {
     turnsLive.current = [...turnsLive.current, t];
@@ -325,7 +329,7 @@ function VoiceIntakeInner({ demo, onSpec }: { demo: boolean; onSpec: (spec: Part
           </span>
         </div>
         {turns.length > 0 && (
-          <div className="max-h-48 space-y-1 overflow-y-auto rounded-md border p-3 text-sm">
+          <div ref={scrollRef} className="max-h-48 space-y-1 overflow-y-auto rounded-md border p-3 text-sm">
             {turns.map((t, i) => (
               <p key={i}>
                 <span className="font-medium">{t.source === 'user' ? 'You' : 'Agent'}:</span> {t.message}
