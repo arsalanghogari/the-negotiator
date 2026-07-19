@@ -21,10 +21,23 @@ const idle = (): CallState => ({ status: 'idle', turns: [], quote: null });
 const idleAll = () =>
   Object.fromEntries(SELLERS.map((s) => [s.persona, idle()])) as Record<Persona, CallState>;
 
+// Agents sometimes emit stage directions like "[Confidently]" despite the prompt — never
+// display or speak them.
+const stripDirections = (t: string) => t.replace(/\[[^\]]{0,60}\]\s*/g, '').trim();
+
 // The listen-in call: the ElevenLabs negotiator agent speaks out loud; the simulated
 // "tough" seller replies are generated server-side, spoken via TTS, then fed in as text.
-// `auto` starts the call without a click (demo flow); `onSaved` fires once it's saved.
-function ShowcaseCall({ auto = false, onSaved }: { auto?: boolean; onSaved?: () => void }) {
+// `auto` starts the call without a click (demo flow); `onSaved` fires once it's saved;
+// `onResult` hands the finished turns+quote to the parent so the seller card populates.
+function ShowcaseCall({
+  auto = false,
+  onSaved,
+  onResult,
+}: {
+  auto?: boolean;
+  onSaved?: () => void;
+  onResult?: (turns: TranscriptTurn[], quote: Quote) => void;
+}) {
   const [turns, setTurns] = useState<TranscriptTurn[]>([]);
   const [phase, setPhase] = useState<'idle' | 'live' | 'saving' | 'done'>('idle');
   const [quote, setQuote] = useState<Quote | null>(null);
@@ -41,29 +54,57 @@ function ShowcaseCall({ auto = false, onSaved }: { auto?: boolean; onSaved?: () 
   };
 
   // Listen-in: the seller's reply is spoken aloud (TTS) BEFORE the text goes to the agent,
-  // so the user hears the whole sequence and the two voices never overlap.
-  async function speakSeller(text: string, then: () => void) {
-    const done = (audio?: HTMLAudioElement) => {
-      if (audio) URL.revokeObjectURL(audio.src);
-      sellerAudioRef.current = null;
-      setSellerSpeaking(false);
-      then();
-    };
+  // so the user hears the whole sequence and the two voices never overlap. Resolves when
+  // the audio has finished (or immediately if TTS fails — garnish, never stall the call).
+  function speakSeller(text: string): Promise<void> {
+    return new Promise((resolve) => {
+      const done = (audio?: HTMLAudioElement) => {
+        if (audio) URL.revokeObjectURL(audio.src);
+        sellerAudioRef.current = null;
+        setSellerSpeaking(false);
+        resolve();
+      };
+      (async () => {
+        const res = await fetch('/api/tts', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ text }),
+        });
+        if (!res.ok) throw new Error(`tts ${res.status}`);
+        const audio = new Audio(URL.createObjectURL(await res.blob()));
+        sellerAudioRef.current = audio;
+        audio.onended = () => done(audio);
+        audio.onerror = () => done(audio);
+        setSellerSpeaking(true);
+        await audio.play();
+      })().catch(() => done());
+    });
+  }
+
+  // One seller reply per agent TURN, generated at delivery time so it addresses everything
+  // the agent said (agents split turns into multiple messages; per-message replies fork the
+  // conversation). While the seller "thinks" and speaks, sendUserActivity pings keep the
+  // agent from hitting its turn timeout and barging in over the audio.
+  async function deliverSellerReply() {
+    const ping = setInterval(() => {
+      try { conversation.sendUserActivity(); } catch { /* session ended */ }
+    }, 2000);
     try {
-      const res = await fetch('/api/tts', {
+      const res = await fetch('/api/seller-reply', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ turns: turnsRef.current }),
       });
-      if (!res.ok) throw new Error(`tts ${res.status}`);
-      const audio = new Audio(URL.createObjectURL(await res.blob()));
-      sellerAudioRef.current = audio;
-      audio.onended = () => done(audio);
-      audio.onerror = () => done(audio);
-      setSellerSpeaking(true);
-      await audio.play();
-    } catch {
-      done(); // ponytail: TTS is garnish — degrade to text-only rather than stall the call
+      const { text } = await res.json();
+      if (turnsRef.current.length === 0) return; // call was ended/reset meanwhile
+      push({ speaker: 'seller', text });
+      await speakSeller(text);
+      conversation.sendUserMessage(text);
+    } catch (e) {
+      // A reply in flight when the call wraps up hits a dead session — that's not an error.
+      if (!String(e).includes('No active conversation')) setError(String(e));
+    } finally {
+      clearInterval(ping);
     }
   }
 
@@ -88,25 +129,16 @@ function ShowcaseCall({ auto = false, onSaved }: { auto?: boolean; onSaved?: () 
       },
     },
     onModeChange: gate.onModeChange,
-    onMessage: async ({ source, message }: { source: string; message: string }) => {
+    onMessage: ({ source, message }: { source: string; message: string }) => {
       if (source !== 'ai' || !message) return;
       gate.noteAgentMessage();
-      push({ speaker: 'negotiator', text: message });
-      try {
-        const res = await fetch('/api/seller-reply', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ turns: turnsRef.current }),
-        });
-        const { text } = await res.json();
-        gate.queue(() => {
-          if (turnsRef.current.length === 0) return; // call was ended/reset meanwhile
-          push({ speaker: 'seller', text });
-          void speakSeller(text, () => conversation.sendUserMessage(text));
-        });
-      } catch (e) {
-        setError(String(e));
-      }
+      push({ speaker: 'negotiator', text: stripDirections(message) });
+      // Queue (not fetch) — consecutive agent messages collapse into ONE seller reply,
+      // generated only once the agent's audio has gone quiet.
+      gate.queue(() => {
+        if (turnsRef.current.length === 0) return; // call was ended/reset meanwhile
+        void deliverSellerReply();
+      });
     },
     onError: (e: unknown) => setError(String(e)),
   });
@@ -153,6 +185,7 @@ function ShowcaseCall({ auto = false, onSaved }: { auto?: boolean; onSaved?: () 
       if (!res.ok) throw new Error(j.error);
       setQuote(j.quote);
       setPhase('done');
+      onResult?.(turnsRef.current, j.quote);
       onSaved?.();
     } catch (e) {
       setError(String(e));
@@ -342,7 +375,13 @@ export default function CallsPage() {
       </Card>
 
       <ConversationProvider>
-        <ShowcaseCall auto={voiceAuto} onSaved={voiceAuto ? onVoiceDone : undefined} />
+        <ShowcaseCall
+          auto={voiceAuto}
+          onSaved={voiceAuto ? onVoiceDone : undefined}
+          onResult={(turns, quote) =>
+            setCalls((c) => ({ ...c, tough: { status: 'done', turns, quote } }))
+          }
+        />
       </ConversationProvider>
 
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
