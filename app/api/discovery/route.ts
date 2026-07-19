@@ -6,7 +6,7 @@ export const maxDuration = 15;
 // programmatically, per the brief. Falls back to the baked directory snapshot in config
 // when no key is set or the request fails — a quota hiccup can never break the demo.
 export async function GET() {
-  const key = process.env.GOOGLE_PLACES_API_KEY;
+  const key = process.env.GOOGLE_PLACES_API_KEY || process.env.GOOGLE_MAPS_API_KEY;
   const { discovery } = vertical;
   if (key) {
     try {
