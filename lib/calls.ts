@@ -4,7 +4,7 @@ import type { JobSpec, Quote, Transcript, TranscriptTurn } from '@/types';
 
 const openai = new OpenAI();
 const MODEL = 'gpt-4o';
-const MAX_NEGOTIATOR_TURNS = 12;
+const MAX_NEGOTIATOR_TURNS = 16; // drip-fed details + dispatcher questions need more back-and-forth
 
 type SellerCfg = (typeof vertical.sellers)[number];
 
@@ -36,9 +36,20 @@ export async function runCall(
       })
     : null;
   const negotiatorSystem = vertical.negotiatorPrompt(JSON.stringify(spec), best);
-  const turns: TranscriptTurn[] = [];
+  // Deterministic opener: identical job intro on every call, and no first-turn monologues.
+  const opener: TranscriptTurn = {
+    speaker: 'negotiator',
+    text: `Hi, I'm calling to get a quote for a move on ${spec.preferredDate}: a ${spec.homeSize} from ${spec.origin.city} to ${spec.destination.city}. Could you help me with that?`,
+  };
+  const turns: TranscriptTurn[] = [opener];
+  onTurn(opener);
 
   for (let i = 0; i < MAX_NEGOTIATOR_TURNS; i++) {
+    const sel = await chat(seller.systemPrompt, turns, 'seller');
+    const selTurn: TranscriptTurn = { speaker: 'seller', text: (sel.choices[0].message.content ?? '').trim() };
+    turns.push(selTurn);
+    onTurn(selTurn);
+
     const neg = await chat(negotiatorSystem, turns, 'negotiator');
     const negText = neg.choices[0].message.content ?? '';
     const hangUp = negText.includes('[HANG_UP]');
@@ -46,11 +57,6 @@ export async function runCall(
     turns.push(turn);
     onTurn(turn);
     if (hangUp) break;
-
-    const sel = await chat(seller.systemPrompt, turns, 'seller');
-    const selTurn: TranscriptTurn = { speaker: 'seller', text: (sel.choices[0].message.content ?? '').trim() };
-    turns.push(selTurn);
-    onTurn(selTurn);
   }
 
   return {
@@ -108,7 +114,9 @@ export async function extractQuote(transcript: Transcript): Promise<Quote> {
   });
   const ex = JSON.parse(res.choices[0].message.content ?? '{}');
 
-  // Deterministic guard: the red-flag rule is code, not model judgment.
+  // Deterministic guards: these rules are code, not model judgment.
+  // A negotiated price means the final total IS the negotiated price.
+  if (ex.negotiated && ex.priceAfter != null) ex.totalPrice = ex.priceAfter;
   const threshold = vertical.marketMedian * (1 - vertical.redFlagBelowMedianPct);
   const redFlag = ex.totalPrice > 0 && ex.totalPrice <= threshold;
   return {
