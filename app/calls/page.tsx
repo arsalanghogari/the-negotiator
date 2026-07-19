@@ -47,6 +47,12 @@ function ShowcaseCall({
   const convIdRef = useRef(''); // ElevenLabs conversation id — lets the report link the recording
   const specRef = useRef(''); // job-spec JSON, fetched before connect, injected in onConnect
   const sellerAudioRef = useRef<HTMLAudioElement | null>(null);
+  // The SDK snapshots client tools at registration, so log_quote → finish() runs with that
+  // render's props — where onSaved was still undefined. Refs always point at the latest.
+  const onSavedRef = useRef(onSaved);
+  const onResultRef = useRef(onResult);
+  onSavedRef.current = onSaved;
+  onResultRef.current = onResult;
   const gate = useSpeechGate();
   const push = (t: TranscriptTurn) => {
     turnsRef.current = [...turnsRef.current, t];
@@ -185,8 +191,8 @@ function ShowcaseCall({
       if (!res.ok) throw new Error(j.error);
       setQuote(j.quote);
       setPhase('done');
-      onResult?.(turnsRef.current, j.quote);
-      onSaved?.();
+      onResultRef.current?.(turnsRef.current, j.quote);
+      onSavedRef.current?.();
     } catch (e) {
       setError(String(e));
       setPhase('idle');
