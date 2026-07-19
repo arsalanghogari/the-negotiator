@@ -12,21 +12,24 @@ export const vertical = {
   // sight-unseen estimates run 40% over; anything far below the competition is bait).
   redFlagBelowMedianPct: 0.3,
 
-  // Where the call list comes from in the real world: a Places-style business search.
-  // ponytail: static fixture shaped like a Google Places result — a live Places query
-  // slots in behind this same field without touching any caller.
+  // Where the call list comes from in the real world: a business-directory search.
+  // These are REAL companies from an actual moveBuddha directory query (fetched 2026-07-18).
+  // Demo mode never dials them — the negotiator calls fictional stand-in personas so no real
+  // business is ever misrepresented; live mode would dial this list via Twilio/SIP.
+  // ponytail: baked query result — a live Google Places/Yelp query slots in behind this same field.
   discovery: {
-    source: 'Google Places',
+    source: 'moveBuddha mover directory',
     query: 'moving companies near San Jose, CA',
+    fetched: '2026-07-18',
     candidates: [
-      { name: 'Bay Area Van Lines', rating: 4.8, reviews: 312, phone: '(408) 555-0184' },
-      { name: 'Golden Gate Premier Moving', rating: 4.6, reviews: 205, phone: '(415) 555-0132' },
-      { name: 'South Bay Moving & Storage', rating: 4.5, reviews: 158, phone: '(408) 555-0117' },
-      { name: 'Mission Movers', rating: 4.4, reviews: 96, phone: '(415) 555-0163' },
-      { name: 'Peninsula Pro Relocation', rating: 4.3, reviews: 74, phone: '(650) 555-0141' },
-      { name: 'Budget Moves Co', rating: 3.9, reviews: 121, phone: '(408) 555-0109' },
-      { name: 'AAA Cheap Movers', rating: 3.2, reviews: 43, phone: '(408) 555-0177' },
-      { name: 'Valley Haulers', rating: 3.0, reviews: 28, phone: '(669) 555-0125' },
+      { name: 'Fairprice Movers', rating: 4.58, reviews: 748, phone: '(408) 213-8139' },
+      { name: 'Southwest Moving', rating: 4.56, reviews: 343, phone: '(408) 412-3269' },
+      { name: 'All In Moving Systems', rating: 4.48, reviews: 553, phone: '(888) 259-0707' },
+      { name: 'Lunardi Moving', rating: 4.48, reviews: 544, phone: '(408) 849-9630' },
+      { name: 'All Reasons Moving & Storage', rating: 4.44, reviews: 306, phone: '(408) 240-0244' },
+      { name: 'Silicon Valley Moving and Storage', rating: 4.44, reviews: 165, phone: '(408) 941-0600' },
+      { name: 'Pure Moving Company', rating: 4.42, reviews: 209, phone: '(888) 572-4486' },
+      { name: 'California Movers Local & Long Distance', rating: 4.36, reviews: 1013, phone: '(415) 481-4343' },
     ],
   },
 

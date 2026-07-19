@@ -22,7 +22,8 @@ Click **▶ Run demo** on the landing page: intake → 4 live negotiation calls 
 ```
 Intake (ElevenLabs voice interview OR document upload → gpt-4o vision)
    → JobSpec (confirmed by user, reused verbatim on every call)
-   → Call list: Places-style discovery panel shows where the numbers come from
+   → Call list: real San Jose movers from an actual moveBuddha directory query
+     (demo role-plays fictional stand-ins; live mode would dial these via Twilio/SIP)
    → Calls: negotiator ↔ 4 simulated seller personas
      (lowballer / stonewaller / upseller / tough)
        · sequential, so earlier binding quotes arm later calls with leverage

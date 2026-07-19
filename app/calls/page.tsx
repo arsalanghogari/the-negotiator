@@ -252,21 +252,24 @@ export default function CallsPage() {
         </CardHeader>
         <CardContent className="space-y-2">
           <p className="text-xs text-muted-foreground">
-            Query: &ldquo;{vertical.discovery.query}&rdquo; — the {SELLERS.length}{' '}
-            highlighted below are on today&apos;s call sheet.
+            Real listings: &ldquo;{vertical.discovery.query}&rdquo;, {vertical.discovery.source} (fetched{' '}
+            {vertical.discovery.fetched}). Live mode dials these numbers via Twilio/SIP; demo mode
+            role-plays the {SELLERS.length} on the call sheet with fictional stand-ins so no real
+            business is misrepresented.
           </p>
           <div className="grid grid-cols-2 gap-x-8 gap-y-1 text-sm">
-            {vertical.discovery.candidates.map((c) => {
-              const calling = SELLERS.some((s) => s.name === c.name);
+            {vertical.discovery.candidates.map((c, i) => {
+              const onSheet = i < SELLERS.length;
               return (
                 <div key={c.name} className="flex items-center justify-between gap-2">
-                  <span className={calling ? 'font-medium' : 'text-muted-foreground'}>
+                  <span className={onSheet ? 'font-medium' : 'text-muted-foreground'}>
                     {c.name}{' '}
-                    <span className="text-xs text-muted-foreground">★ {c.rating.toFixed(1)} ({c.reviews})</span>
+                    <span className="text-xs text-muted-foreground">★ {c.rating} ({c.reviews})</span>
                   </span>
-                  {calling
-                    ? <Badge variant="outline">calling</Badge>
-                    : <span className="text-xs text-muted-foreground">{c.phone}</span>}
+                  <span className="flex shrink-0 items-center gap-2">
+                    <span className="text-xs text-muted-foreground">{c.phone}</span>
+                    {onSheet && <Badge variant="outline">on call sheet</Badge>}
+                  </span>
                 </div>
               );
             })}
