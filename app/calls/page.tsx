@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { ConversationProvider, useConversation } from '@elevenlabs/react';
+import { useSpeechGate } from '@/lib/use-speech-gate';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -26,32 +27,11 @@ function ShowcaseCall() {
   const [quote, setQuote] = useState<Quote | null>(null);
   const [error, setError] = useState('');
   const turnsRef = useRef<TranscriptTurn[]>([]);
-  // The gate: closed from the moment a negotiator message arrives until its audio has
-  // started AND finished. "Finished" can't be the first silence — the SDK's mode signal
-  // is a voice-activity detector that flickers during pauses inside a sentence — so the
-  // gate opens only after SILENCE_MS of continuous silence.
-  const SILENCE_MS = 1500;
-  const speakingRef = useRef(false);
-  const awaitingSpeechRef = useRef(false);
-  const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingReplyRef = useRef<string | null>(null);
+  const gate = useSpeechGate();
   const push = (t: TranscriptTurn) => {
     turnsRef.current = [...turnsRef.current, t];
     setTurns(turnsRef.current);
   };
-
-  function gateOpen() {
-    return !speakingRef.current && !awaitingSpeechRef.current;
-  }
-
-  function flushReply() {
-    const text = pendingReplyRef.current;
-    if (!text || !gateOpen()) return;
-    pendingReplyRef.current = null;
-    if (turnsRef.current.length === 0) return; // call was ended/reset meanwhile
-    push({ speaker: 'seller', text });
-    conversation.sendUserMessage(text); // the silence window already provides the natural beat
-  }
 
   const conversation = useConversation({
     micMuted: true, // no human on this call; the seller feeds in as text
@@ -59,40 +39,15 @@ function ShowcaseCall() {
       get_best_competing_quote: async () => JSON.stringify(await (await fetch('/api/best-quote')).json()),
       log_quote: (p: { quote_json: string }) => {
         void p; // the authoritative Quote comes from transcript extraction on save
-        pendingReplyRef.current = null; // no reply after the goodbye
+        gate.clear(); // no reply after the goodbye
         setTimeout(finish, 6000); // let the goodbye line play out
         return 'logged';
       },
     },
-    onModeChange: ({ mode }: { mode: string }) => {
-      if (mode === 'speaking') {
-        speakingRef.current = true;
-        awaitingSpeechRef.current = false; // speech started — half the cycle done
-        if (silenceTimerRef.current) {
-          clearTimeout(silenceTimerRef.current); // a flicker, not the end of the turn
-          silenceTimerRef.current = null;
-        }
-      } else if (speakingRef.current && !silenceTimerRef.current) {
-        silenceTimerRef.current = setTimeout(() => {
-          silenceTimerRef.current = null;
-          speakingRef.current = false; // sustained silence — the turn is really over
-          flushReply();
-        }, SILENCE_MS);
-      }
-    },
+    onModeChange: gate.onModeChange,
     onMessage: async ({ source, message }: { source: string; message: string }) => {
       if (source !== 'ai' || !message) return;
-      // Close the gate until this turn's audio has played (unless it's already playing).
-      if (!speakingRef.current) {
-        awaitingSpeechRef.current = true;
-        // Failsafe: if no audio ever starts (shouldn't happen), don't deadlock the call.
-        setTimeout(() => {
-          if (awaitingSpeechRef.current) {
-            awaitingSpeechRef.current = false;
-            flushReply();
-          }
-        }, 8000);
-      }
+      gate.noteAgentMessage();
       push({ speaker: 'negotiator', text: message });
       try {
         const res = await fetch('/api/seller-reply', {
@@ -101,8 +56,11 @@ function ShowcaseCall() {
           body: JSON.stringify({ turns: turnsRef.current }),
         });
         const { text } = await res.json();
-        pendingReplyRef.current = text;
-        flushReply(); // no-op unless the gate is already open
+        gate.queue(() => {
+          if (turnsRef.current.length === 0) return; // call was ended/reset meanwhile
+          push({ speaker: 'seller', text });
+          conversation.sendUserMessage(text);
+        });
       } catch (e) {
         setError(String(e));
       }

@@ -7,8 +7,8 @@ export default function Home() {
 
   async function runDemo() {
     setBusy(true);
-    await fetch('/api/demo-seed', { method: 'POST' });
-    window.location.href = '/calls?demo=1';
+    await fetch('/api/demo-seed', { method: 'POST' }); // fallback spec if the voice intake is skipped
+    window.location.href = '/intake?demo=1';
   }
 
   return (
@@ -34,7 +34,7 @@ export default function Home() {
         </button>
       </div>
       <p className="text-sm text-muted-foreground">
-        Run demo plays the whole loop: intake → 3 negotiation calls → ranked report.
+        Run demo plays the whole loop: voice intake with a synthetic customer → 3 negotiation calls → ranked report.
       </p>
     </main>
   );

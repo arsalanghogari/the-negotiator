@@ -74,6 +74,21 @@ export async function runCall(
   };
 }
 
+// Synthetic customer for the demo voice intake (the ElevenLabs intake agent asks; this answers).
+// Turn mapping: 'negotiator' = the intake agent, 'seller' = the customer.
+export async function demoCustomerReply(turns: TranscriptTurn[]): Promise<string> {
+  const { demoJobSpec: s } = await import('@/lib/demo');
+  const system = `You are ${s.customerName}, a customer on a phone call with a moving-company intake assistant. The facts of your move:
+- Moving ${s.preferredDate} from ${s.origin.city} ${s.origin.zip} (floor ${s.origin.floor}, ${s.origin.hasElevator ? 'has' : 'no'} elevator) to ${s.destination.city} ${s.destination.zip} (floor ${s.destination.floor}, ${s.destination.hasElevator ? 'has' : 'no'} elevator), about ${s.distanceMiles} miles.
+- ${s.homeSize} home, roughly ${s.boxCountEst} boxes, large items: ${s.largeItems.join(', ')}.
+- ${s.stairsFlights} flights of stairs, ${s.longCarry ? 'long carry from street parking' : 'no long carry'}, ${s.packingService ? 'packing service wanted' : 'no packing service needed'}.
+- Notes: ${s.specialNotes}
+- Your email: ${s.contactEmail}
+Answer the assistant's questions naturally and briefly — 1-2 short sentences, only what was asked, don't volunteer everything at once. When the assistant reads the spec back, confirm it's correct. Never break character; output only your spoken words.`;
+  const res = await chat(system, turns, 'seller');
+  return (res.choices[0].message.content ?? '').trim();
+}
+
 // One seller reply for the showcased voice call (the ElevenLabs agent is the negotiator).
 export async function showcaseSellerReply(turns: TranscriptTurn[]): Promise<string> {
   const seller = vertical.sellers.find((s) => s.persona === 'tough')!;

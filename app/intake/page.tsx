@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ConversationProvider, useConversation } from '@elevenlabs/react';
+import { useSpeechGate } from '@/lib/use-speech-gate';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -32,6 +33,23 @@ export default function IntakePage() {
   const [spec, setSpec] = useState<JobSpec>(empty);
   const [busy, setBusy] = useState<'extract' | 'save' | null>(null);
   const [message, setMessage] = useState('');
+  const [demo, setDemo] = useState(false);
+
+  useEffect(() => {
+    setDemo(new URLSearchParams(window.location.search).get('demo') === '1');
+  }, []);
+
+  // Demo flow: the voice intake produced a confirmed spec — save it and roll into the calls.
+  async function demoConfirm(merged: JobSpec) {
+    const final = { ...merged, jobId: 'job-demo-1', confirmedByUser: true };
+    await fetch('/api/jobspec', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(final),
+    });
+    setMessage('Spec confirmed — starting the negotiation calls…');
+    setTimeout(() => { window.location.href = '/calls?demo=1'; }, 4000); // let the agent say goodbye
+  }
 
   const set = (patch: Partial<JobSpec>) => setSpec((s) => ({ ...s, ...patch }));
 
@@ -101,9 +119,14 @@ export default function IntakePage() {
       </Card>
 
       <VoiceIntake
+        demo={demo}
         onSpec={(ex) => {
-          setSpec((s) => ({ ...s, ...ex, origin: { ...s.origin, ...ex.origin }, destination: { ...s.destination, ...ex.destination } }));
-          setMessage('Voice intake captured — review and confirm below.');
+          setSpec((s) => {
+            const merged = { ...s, ...ex, origin: { ...s.origin, ...ex.origin }, destination: { ...s.destination, ...ex.destination } };
+            if (demo) demoConfirm(merged);
+            return merged;
+          });
+          if (!demo) setMessage('Voice intake captured — review and confirm below.');
         }}
       />
 
@@ -206,7 +229,7 @@ export default function IntakePage() {
   );
 }
 
-function VoiceIntake(props: { onSpec: (spec: Partial<JobSpec>) => void }) {
+function VoiceIntake(props: { demo: boolean; onSpec: (spec: Partial<JobSpec>) => void }) {
   return (
     <ConversationProvider>
       <VoiceIntakeInner {...props} />
@@ -214,31 +237,65 @@ function VoiceIntake(props: { onSpec: (spec: Partial<JobSpec>) => void }) {
   );
 }
 
-function VoiceIntakeInner({ onSpec }: { onSpec: (spec: Partial<JobSpec>) => void }) {
+function VoiceIntakeInner({ demo, onSpec }: { demo: boolean; onSpec: (spec: Partial<JobSpec>) => void }) {
   const [turns, setTurns] = useState<{ source: string; message: string }[]>([]);
   const [error, setError] = useState('');
+  const gate = useSpeechGate();
+  const turnsLive = useRef<{ source: string; message: string }[]>([]);
+  const addTurn = (t: { source: string; message: string }) => {
+    turnsLive.current = [...turnsLive.current, t];
+    setTurns(turnsLive.current);
+  };
   const conversation = useConversation({
+    micMuted: demo, // demo: a synthetic customer answers as text; no human mic
     clientTools: {
       // The intake agent calls this after the user confirms the spec verbally.
       save_job_spec: (params: { job_spec_json: string }) => {
         try {
           onSpec(JSON.parse(params.job_spec_json));
+          if (demo) gate.clear(); // no more replies; parent takes over
           return 'saved';
         } catch {
           return 'invalid JSON, please retry with valid JSON';
         }
       },
     },
-    onMessage: ({ source, message }: { source: string; message: string }) =>
-      setTurns((t) => [...t, { source, message }]),
+    onModeChange: gate.onModeChange,
+    onMessage: async ({ source, message }: { source: string; message: string }) => {
+      addTurn({ source, message });
+      if (!demo || source !== 'ai' || !message) return;
+      gate.noteAgentMessage();
+      try {
+        // Turn mapping for the customer model: agent = 'negotiator', customer = 'seller'.
+        const history = turnsLive.current.map((t) => ({
+          speaker: t.source === 'ai' ? 'negotiator' : 'seller',
+          text: t.message,
+        }));
+        const res = await fetch('/api/customer-reply', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ turns: history }),
+        });
+        const { text } = await res.json();
+        gate.queue(() => {
+          addTurn({ source: 'user', message: text });
+          conversation.sendUserMessage(text);
+        });
+      } catch (e) {
+        setError(String(e));
+      }
+    },
     onError: (e: unknown) => setError(String(e)),
   });
 
   async function start() {
     setError('');
+    turnsLive.current = [];
     setTurns([]);
     try {
-      await navigator.mediaDevices.getUserMedia({ audio: true });
+      await navigator.mediaDevices.getUserMedia({ audio: true }).catch(() => {
+        if (!demo) throw new Error('microphone required for the live interview');
+      });
       const res = await fetch('/api/voice-token?agent=intake');
       const { token, error } = await res.json();
       if (!res.ok) throw new Error(error);
@@ -250,15 +307,21 @@ function VoiceIntakeInner({ onSpec }: { onSpec: (spec: Partial<JobSpec>) => void
 
   const live = conversation.status === 'connected';
   return (
-    <Card>
-      <CardHeader><CardTitle>Voice interview</CardTitle></CardHeader>
+    <Card className={demo ? 'border-indigo-600' : ''}>
+      <CardHeader>
+        <CardTitle>{demo ? 'Voice interview — demo customer 🔊' : 'Voice interview'}</CardTitle>
+      </CardHeader>
       <CardContent className="space-y-3">
         <div className="flex items-center gap-3">
           <Button onClick={live ? () => conversation.endSession() : start} variant={live ? 'destructive' : 'default'}>
-            {live ? 'End interview' : 'Start voice interview'}
+            {live ? 'End interview' : demo ? '▶ Start demo interview' : 'Start voice interview'}
           </Button>
           <span className="text-sm text-muted-foreground">
-            {live ? (conversation.isSpeaking ? 'Agent speaking…' : 'Listening…') : 'Answer a few questions, confirm, and the form fills itself.'}
+            {live
+              ? conversation.isSpeaking ? 'Agent speaking…' : 'Listening…'
+              : demo
+                ? 'A synthetic customer answers the intake agent out loud; the form fills itself, then the calls start.'
+                : 'Answer a few questions, confirm, and the form fills itself.'}
           </span>
         </div>
         {turns.length > 0 && (
