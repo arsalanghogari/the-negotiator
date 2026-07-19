@@ -2,6 +2,7 @@
 // Fails loudly if a deterministic rule was violated or the negotiator invented a bid.
 import { readAll } from '../lib/store.ts';
 import { vertical } from '../config/vertical.ts';
+import { itemizationMismatch } from '../lib/quote-rules.ts';
 import type { Quote, Transcript } from '../types.ts';
 
 const quotes = await readAll<Quote>('quotes');
@@ -17,13 +18,9 @@ for (const q of quotes) {
     errors.push(`${q.quoteId}: negotiated but totalPrice ${q.totalPrice} != priceAfter ${q.priceAfter}`);
   if (!['quoted', 'callback', 'declined'].includes(q.callOutcome))
     errors.push(`${q.quoteId}: bad callOutcome ${q.callOutcome}`);
-  const amounts = q.lineItems.map((li) => li.amount);
-  if (amounts.every((a) => a != null)) {
-    const stated = q.negotiated && q.priceBefore != null ? q.priceBefore : q.totalPrice;
-    const mismatch = q.basePrice + amounts.reduce((s, a) => s + a, 0) !== stated;
-    if ((q.itemizationMismatch ?? false) !== mismatch)
-      errors.push(`${q.quoteId}: itemizationMismatch=${q.itemizationMismatch}, rule says ${mismatch}`);
-  }
+  const mismatch = itemizationMismatch(q);
+  if ((q.itemizationMismatch ?? false) !== mismatch)
+    errors.push(`${q.quoteId}: itemizationMismatch=${q.itemizationMismatch}, rule says ${mismatch}`);
 }
 
 // 2. Honesty: every "binding quote for $X" the negotiator cites must exist among stored quotes.
