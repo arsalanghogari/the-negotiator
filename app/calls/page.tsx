@@ -43,9 +43,11 @@ function ShowcaseCall({
   const [quote, setQuote] = useState<Quote | null>(null);
   const [error, setError] = useState('');
   const [sellerSpeaking, setSellerSpeaking] = useState(false);
+  const [violations, setViolations] = useState<number[]>([]);
   const turnsRef = useRef<TranscriptTurn[]>([]);
   const convIdRef = useRef(''); // ElevenLabs conversation id — lets the report link the recording
   const specRef = useRef(''); // job-spec JSON, fetched before connect, injected in onConnect
+  const quoteStateRef = useRef(''); // true competing-quote state, kept in the agent's face
   const sellerAudioRef = useRef<HTMLAudioElement | null>(null);
   // The SDK snapshots client tools at registration, so log_quote → finish() runs with that
   // render's props — where onSaved was still undefined. Refs always point at the latest.
@@ -104,8 +106,15 @@ function ShowcaseCall({
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ turns: turnsRef.current }),
       });
-      const { text } = await res.json();
+      const { text, violation } = await res.json();
       if (turnsRef.current.length === 0) return; // call was ended/reset meanwhile
+      if (violation != null) {
+        // The agent invented a competing quote — correct it immediately and visibly.
+        setViolations((v) => [...v, violation]);
+        conversation.sendContextualUpdate(
+          `CORRECTION: you cited $${violation.toLocaleString()} as a competing quote — no such quote exists for this job. Never repeat that number. If pressed, walk it back honestly ("let me double-check that — I may have misspoken"). Your true competing-quote state: ${quoteStateRef.current}`
+        );
+      }
       push({ speaker: 'seller', text });
       await speakSeller(text);
       conversation.sendUserMessage(text);
@@ -124,7 +133,7 @@ function ShowcaseCall({
     onConnect: ({ conversationId }: { conversationId: string }) => {
       convIdRef.current = conversationId;
       conversation.sendContextualUpdate(
-        `Confirmed job spec for this call (your only source of truth): ${specRef.current}. You are calling "${TOUGH_NAME}".`
+        `Confirmed job spec for this call (your only source of truth): ${specRef.current}. You are calling "${TOUGH_NAME}". Competing-quote state: ${quoteStateRef.current} Any competing amount you state that is not this exact state is a lie.`
       );
       setPhase('live');
     },
@@ -156,6 +165,7 @@ function ShowcaseCall({
     if (phase !== 'idle') return;
     setError('');
     setQuote(null);
+    setViolations([]);
     turnsRef.current = [];
     setTurns([]);
     try {
@@ -166,6 +176,9 @@ function ShowcaseCall({
       if (!res.ok) throw new Error(error);
       const spec = (await (await fetch('/api/jobspec')).json()).at(-1);
       specRef.current = JSON.stringify(vertical.specForCall(spec));
+      // The true competing-quote state rides along in the connect context — the agent
+      // must not depend on remembering to call the tool before citing leverage.
+      quoteStateRef.current = (await (await fetch('/api/best-quote')).json()).answer;
       // Fire-and-forget: onConnect takes it from here; failures surface via onError.
       conversation.startSession({ conversationToken: token });
     } catch (e) {
@@ -244,6 +257,12 @@ function ShowcaseCall({
               ))}
             </div>
           )}
+          {violations.map((v, i) => (
+            <p key={i} className="rounded-md border border-amber/50 bg-amber/10 p-2 text-sm text-white/90">
+              ⚑ Parley cited a ${v.toLocaleString()} competing quote that doesn&apos;t exist — the seller
+              was told to demand it in writing, and the agent was corrected live.
+            </p>
+          ))}
           {quote && (
             <p className="font-mono text-sm font-medium text-signal">
               Saved: ${quote.totalPrice.toLocaleString()} {quote.binding && '(binding)'}

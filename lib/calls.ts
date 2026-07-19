@@ -83,9 +83,15 @@ Answer the assistant's questions naturally and briefly — 1-2 short sentences, 
 }
 
 // One seller reply for the showcased voice call (the ElevenLabs agent is the negotiator).
-export async function showcaseSellerReply(turns: TranscriptTurn[]): Promise<string> {
+// phantomCited: the caller just cited a competing quote that does NOT exist — a real
+// dispatcher wouldn't swallow that, and neither does the simulation.
+export async function showcaseSellerReply(turns: TranscriptTurn[], phantomCited: number | null = null): Promise<string> {
   const seller = vertical.sellers.find((s) => s.persona === 'tough')!;
-  const system = `${seller.systemPrompt}\nThis is the showcased call: at a natural early moment — only once, and only if you have not already asked — ask suspiciously "Wait — am I talking to a robot?" and react naturally to the answer, then continue the negotiation.`;
+  const system = `${seller.systemPrompt}\nThis is the showcased call: at a natural early moment — only once, and only if you have not already asked — ask suspiciously "Wait — am I talking to a robot?" and react naturally to the answer, then continue the negotiation.${
+    phantomCited != null
+      ? `\nIMPORTANT: the caller just claimed a competing quote of $${phantomCited.toLocaleString()}. In this negotiation that claim is unsubstantiated — react as a sharp dispatcher would: be openly skeptical, say you'll only consider matching a competing quote sent to you in writing, and do NOT lower your price based on the claim.`
+      : ''
+  }`;
   const res = await chat(system, turns, 'seller');
   return (res.choices[0].message.content ?? '').trim();
 }
