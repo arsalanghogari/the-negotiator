@@ -13,6 +13,13 @@ import type { Persona, Quote, TranscriptTurn } from '@/types';
 const SELLERS = vertical.sellers.map((s) => ({ persona: s.persona, name: s.providerName }));
 const TOUGH_NAME = vertical.sellers.find((s) => s.persona === 'tough')!.providerName;
 
+type Discovery = {
+  source: string;
+  query: string;
+  candidates: { name: string; rating?: number; reviews?: number; phone?: string }[];
+  live: boolean;
+};
+
 type CallState = {
   status: 'idle' | 'calling' | 'extracting' | 'done';
   turns: TranscriptTurn[];
@@ -282,6 +289,15 @@ export default function CallsPage() {
   const [demoStep, setDemoStep] = useState('');
   const [voiceAuto, setVoiceAuto] = useState(false);
   const [generating, setGenerating] = useState(false);
+  // Baked snapshot renders instantly; the live Google Places result replaces it when a
+  // key is configured server-side.
+  const [discovery, setDiscovery] = useState<Discovery>({ ...vertical.discovery, live: false });
+  useEffect(() => {
+    fetch('/api/discovery')
+      .then((r) => r.json())
+      .then(setDiscovery)
+      .catch(() => {});
+  }, []);
   const scrollRefs = useRef<Partial<Record<Persona, HTMLDivElement | null>>>({});
 
   // Run-demo flow: /calls?demo=1 auto-runs the calls, then generates the report and moves on.
@@ -388,13 +404,21 @@ export default function CallsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">
-            Call list — {vertical.discovery.candidates.length} {vertical.counterpartyPlural} found via {vertical.discovery.source}
+          <CardTitle className="flex items-center justify-between text-base">
+            <span>
+              Call list — {discovery.candidates.length} {vertical.counterpartyPlural} found via {discovery.source}
+            </span>
+            {discovery.live && (
+              <Badge className="gap-1.5 bg-signal/20 font-mono text-xs text-foreground">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-signal-deep" />
+                live
+              </Badge>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
           <div className="grid grid-cols-2 gap-x-8 gap-y-1 text-sm">
-            {vertical.discovery.candidates.map((c, i) => {
+            {discovery.candidates.map((c, i) => {
               const onSheet = i < SELLERS.length;
               return (
                 <div key={c.name} className="flex items-center justify-between gap-2">
