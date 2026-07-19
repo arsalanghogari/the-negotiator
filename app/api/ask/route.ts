@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import { readAll } from '@/lib/store';
+import { vertical } from '@/config/vertical';
 import type { JobSpec, Quote, Report, Transcript } from '@/types';
 
 export const maxDuration = 60;
@@ -29,7 +30,7 @@ export async function POST(req: Request) {
     messages: [
       {
         role: 'system',
-        content: `You are The Negotiator's assistant, answering a customer's questions about their moving quotes. Use ONLY the data below — never invent numbers, providers, or transcript moments. If the data doesn't answer the question, say so plainly. Be concise (a short paragraph at most) and cite concrete figures.
+        content: `You are Parley's assistant, answering a customer's questions about their ${vertical.jobNoun} quotes. Use ONLY the data below — never invent numbers, providers, or transcript moments. If the data doesn't answer the question, say so plainly. Be concise (a short paragraph at most) and cite concrete figures.
 
 JOB SPEC: ${JSON.stringify(spec)}
 QUOTES: ${JSON.stringify(quotes)}

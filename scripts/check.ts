@@ -1,17 +1,26 @@
 // Guardrail checks over the stored demo data. Run: npm run check
 // Fails loudly if a deterministic rule was violated or the negotiator invented a bid.
 import { readAll } from '../lib/store.ts';
-import { vertical } from '../config/vertical.ts';
+import { moving } from '../config/moving.ts';
+import { autobody } from '../config/autobody.ts';
 import { itemizationMismatch } from '../lib/quote-rules.ts';
-import type { Quote, Transcript } from '../types.ts';
+import type { JobSpec, Quote, Transcript } from '../types.ts';
 
 const quotes = await readAll<Quote>('quotes');
 const transcripts = await readAll<Transcript>('transcripts');
+const specs = await readAll<JobSpec>('jobspecs');
 const errors: string[] = [];
 
+// The store holds every vertical's data — each quote is audited against ITS job's rules.
+const jobOf = new Map(transcripts.map((t) => [t.transcriptId, t.jobId]));
+const vertOf = new Map(specs.map((s) => [s.jobId, s.vertical]));
+const configFor = (q: Quote) =>
+  vertOf.get(jobOf.get(q.transcriptRef) ?? '') === 'autobody' ? autobody : moving;
+
 // 1. Red-flag rule is deterministic.
-const threshold = vertical.marketMedian * (1 - vertical.redFlagBelowMedianPct);
 for (const q of quotes) {
+  const cfg = configFor(q);
+  const threshold = cfg.marketMedian * (1 - cfg.redFlagBelowMedianPct);
   const should = q.totalPrice > 0 && q.totalPrice <= threshold;
   if (q.redFlag !== should) errors.push(`${q.quoteId}: redFlag=${q.redFlag}, rule says ${should}`);
   if (q.negotiated && q.priceAfter != null && q.totalPrice !== q.priceAfter)
@@ -25,7 +34,6 @@ for (const q of quotes) {
 
 // 2. Honesty: every "binding quote for $X" the negotiator cites must exist among the
 // SAME JOB's quotes — an amount from another job in the store is still a lie on this call.
-const jobOf = new Map(transcripts.map((t) => [t.transcriptId, t.jobId]));
 const amountsByJob = new Map<string, Set<number>>();
 for (const q of quotes) {
   const job = jobOf.get(q.transcriptRef);

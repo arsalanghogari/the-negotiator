@@ -9,8 +9,6 @@ const MAX_NEGOTIATOR_TURNS = 16; // drip-fed details + dispatcher questions need
 
 type SellerCfg = (typeof vertical.sellers)[number];
 
-const SPOKEN_SIZE = { studio: 'studio', '1br': 'one-bedroom', '2br': 'two-bedroom', '3br+': 'three-plus-bedroom' } as const;
-
 function chat(system: string, turns: TranscriptTurn[], speakAs: 'negotiator' | 'seller') {
   return openai.chat.completions.create({
     model: MODEL,
@@ -38,16 +36,10 @@ export async function runCall(
         binding: bestCompetingQuote.binding,
       })
     : null;
-  const negotiatorSystem = vertical.negotiatorPrompt(JSON.stringify(spec), best);
+  // specForCall: the vertical decides which spec fields the agents see.
+  const negotiatorSystem = vertical.negotiatorPrompt(JSON.stringify(vertical.specForCall(spec)), best);
   // Deterministic opener: identical job intro on every call, and no first-turn monologues.
-  const spokenDate = new Date(`${spec.preferredDate}T00:00:00`).toLocaleDateString('en-US', {
-    month: 'long', day: 'numeric', year: 'numeric',
-  });
-  const spokenSize = SPOKEN_SIZE[spec.homeSize];
-  const opener: TranscriptTurn = {
-    speaker: 'negotiator',
-    text: `Hi, I'm calling to get a quote for a move on ${spokenDate}: a ${spokenSize} from ${spec.origin.city} to ${spec.destination.city}. Could you help me with that?`,
-  };
+  const opener: TranscriptTurn = { speaker: 'negotiator', text: vertical.opener(spec) };
   const turns: TranscriptTurn[] = [opener];
   onTurn(opener);
 
@@ -108,16 +100,16 @@ export function bestBindingQuote(quotes: Quote[]): Quote | null {
 export async function requestInvoiceCall(spec: JobSpec, quote: Quote, email: string): Promise<TranscriptTurn[]> {
   const seller = vertical.sellers.find((s) => s.persona === quote.persona);
   if (!seller) throw new Error(`unknown persona ${quote.persona}`);
-  const context = `${seller.systemPrompt}\nEarlier today you quoted this caller $${quote.totalPrice}${quote.binding ? ' (binding)' : ''} for their move, and you have all the job details on file. They are calling back to accept. Do not ask any questions — happily confirm the booking and that you will email the itemized invoice to the address they give, repeating the address back.`;
+  const context = `${seller.systemPrompt}\nEarlier today you quoted this caller $${quote.totalPrice}${quote.binding ? ' (binding)' : ''} for their ${vertical.jobNoun}, and you have all the job details on file. They are calling back to accept. Do not ask any questions — happily confirm the booking and that you will email the itemized invoice to the address they give, repeating the address back.`;
   const turns: TranscriptTurn[] = [
     {
       speaker: 'negotiator',
-      text: `Hi, I'm calling back about the ${SPOKEN_SIZE[spec.homeSize]} move from ${spec.origin.city} to ${spec.destination.city} we discussed — the booking is for ${spec.customerName || 'my client'}, and we'd like to go ahead with your quote of $${quote.totalPrice.toLocaleString()}. Could you email the itemized invoice to ${email}?`,
+      text: `Hi, I'm calling back about the ${vertical.jobNoun} we discussed — the booking is for ${spec.customerName || 'my client'}, and we'd like to go ahead with your quote of $${quote.totalPrice.toLocaleString()}. Could you email the itemized invoice to ${email}?`,
     },
   ];
   const sel = await chat(context, turns, 'seller');
   turns.push({ speaker: 'seller', text: (sel.choices[0].message.content ?? '').trim() });
-  turns.push({ speaker: 'negotiator', text: 'Perfect, thank you. We look forward to the invoice and to moving day. Goodbye!' });
+  turns.push({ speaker: 'negotiator', text: 'Perfect, thank you. We look forward to the invoice. Goodbye!' });
   return turns;
 }
 

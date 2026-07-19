@@ -11,6 +11,7 @@ import { vertical } from '@/config/vertical';
 import type { Persona, Quote, TranscriptTurn } from '@/types';
 
 const SELLERS = vertical.sellers.map((s) => ({ persona: s.persona, name: s.providerName }));
+const TOUGH_NAME = vertical.sellers.find((s) => s.persona === 'tough')!.providerName;
 
 type CallState = {
   status: 'idle' | 'calling' | 'extracting' | 'done';
@@ -123,7 +124,7 @@ function ShowcaseCall({
     onConnect: ({ conversationId }: { conversationId: string }) => {
       convIdRef.current = conversationId;
       conversation.sendContextualUpdate(
-        `Confirmed job spec for this call (your only source of truth): ${specRef.current}. You are calling the mover "Bay Area Van Lines".`
+        `Confirmed job spec for this call (your only source of truth): ${specRef.current}. You are calling "${TOUGH_NAME}".`
       );
       setPhase('live');
     },
@@ -164,7 +165,7 @@ function ShowcaseCall({
       const { token, error } = await res.json();
       if (!res.ok) throw new Error(error);
       const spec = (await (await fetch('/api/jobspec')).json()).at(-1);
-      specRef.current = JSON.stringify(spec);
+      specRef.current = JSON.stringify(vertical.specForCall(spec));
       // Fire-and-forget: onConnect takes it from here; failures surface via onError.
       conversation.startSession({ conversationToken: token });
     } catch (e) {
@@ -205,7 +206,7 @@ function ShowcaseCall({
     <Card className="border-ink bg-ink text-white">
       <CardHeader>
         <CardTitle className="flex items-center justify-between text-base">
-          <span>Listen in — Bay Area Van Lines, both sides live 🔊</span>
+          <span>Listen in — {TOUGH_NAME}, both sides live 🔊</span>
           <span className="flex items-center gap-2">
             {phase === 'live' && (
               <Badge className="gap-1.5 bg-signal/15 font-mono text-signal">
@@ -276,10 +277,10 @@ export default function CallsPage() {
   // Demo: fast text calls first (they arm the negotiator with leverage), then the audible
   // listen-in call against the tough seller; the report waits for that call to finish.
   async function runDemo() {
-    setDemoStep(`Calling ${SELLERS.length - 1} movers…`);
+    setDemoStep(`Calling ${SELLERS.length - 1} ${vertical.counterpartyPlural}…`);
     const ok = await run('tough');
     if (!ok) return setDemoStep('');
-    setDemoStep('Now listen in — live voice negotiation with Bay Area Van Lines…');
+    setDemoStep(`Now listen in — live voice negotiation with ${TOUGH_NAME}…`);
     setVoiceAuto(true); // ShowcaseCall auto-starts; onVoiceDone continues the demo
   }
 
@@ -370,7 +371,7 @@ export default function CallsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">
-            Call list — {vertical.discovery.candidates.length} movers found via {vertical.discovery.source}
+            Call list — {vertical.discovery.candidates.length} {vertical.counterpartyPlural} found via {vertical.discovery.source}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
@@ -387,10 +388,14 @@ export default function CallsPage() {
                 <div key={c.name} className="flex items-center justify-between gap-2">
                   <span className={onSheet ? 'font-medium' : 'text-muted-foreground'}>
                     {c.name}{' '}
-                    <span className="font-mono text-xs text-muted-foreground">★ {c.rating} ({c.reviews})</span>
+                    {c.rating != null && (
+                      <span className="font-mono text-xs text-muted-foreground">
+                        ★ {c.rating}{c.reviews != null && ` (${c.reviews})`}
+                      </span>
+                    )}
                   </span>
                   <span className="flex shrink-0 items-center gap-2">
-                    <span className="font-mono text-xs text-muted-foreground">{c.phone}</span>
+                    {c.phone && <span className="font-mono text-xs text-muted-foreground">{c.phone}</span>}
                     {onSheet && <Badge variant="outline">on call sheet</Badge>}
                   </span>
                 </div>

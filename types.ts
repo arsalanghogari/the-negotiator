@@ -4,7 +4,9 @@ export type CallOutcome = 'quoted' | 'callback' | 'declined';
 
 export interface JobSpec {
   jobId: string;
-  vertical: 'moving';
+  vertical: string;
+  vehicle?: string; // autobody vertical
+  damageDescription?: string; // autobody vertical
   origin: { city: string; zip: string; floor: number; hasElevator: boolean };
   destination: { city: string; zip: string; floor: number; hasElevator: boolean };
   distanceMiles: number;

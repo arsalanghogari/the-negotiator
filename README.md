@@ -44,7 +44,14 @@ Intake (ElevenLabs voice interview OR document upload → gpt-4o vision)
 
 ## Design notes
 
-- **Vertical is config, not code.** Everything moving-specific — job-spec fields aside, all benchmarks, red-flag rules, personas, provider names, and prompts — lives in [`config/vertical.ts`](config/vertical.ts). Switching to auto body shops means swapping that file (plus the `JobSpec` type), not rewriting agents.
+- **Vertical is config, not code — demonstrated.** Everything market-specific (benchmarks, red-flag rules, discovery data, personas, prompts, spoken openers) lives in one file per vertical: [`config/moving.ts`](config/moving.ts) and [`config/autobody.ts`](config/autobody.ts), selected by [`config/vertical.ts`](config/vertical.ts). The swap, live:
+
+  ```bash
+  npm run seed:autobody
+  NEXT_PUBLIC_VERTICAL=autobody npm run dev   # same engine now negotiates collision repair
+  ```
+
+  Same calls → extraction → red flags → ranked report, now over bumper repairs with real San Jose body-shop listings and 2025 repair benchmarks. (The intake form's fields are the one moving-shaped piece — each vertical's `specForCall` controls what the agents actually see.)
 - **Counterparty seam.** Sellers are OpenAI-driven personas today (`DEMO_MODE=true`, fully reproducible with zero phone/human input). The negotiator logic doesn't know or care — a human-mic or Twilio counterparty can slot in behind the same interface.
 - **Persistence seam.** Local JSON store (`.data/`) behind `lib/store.ts`; Supabase swaps in via env vars without touching callers.
 - Sequential calls are deliberate (leverage chain); parallelism would go in `/api/calls/run`.
