@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { vertical } from '@/config/vertical';
 import type { InvoiceRequest, JobSpec, Quote, Report, Transcript } from '@/types';
 
 type Bundle = { report: Report | null; transcripts: Transcript[]; spec: JobSpec };
@@ -63,6 +64,12 @@ export default function ReportPage() {
                 </Badge>
               )}
             </div>
+            <p className="mt-3 text-xs text-muted-foreground">
+              Market benchmark: ${vertical.marketMedian.toLocaleString()} median, observed range $
+              {vertical.marketRange.low.toLocaleString()}–${vertical.marketRange.high.toLocaleString()} (
+              {vertical.marketSource}). Red-flag rule: any quote ≥
+              {vertical.redFlagBelowMedianPct * 100}% below median is treated as a lowball warning, not a win.
+            </p>
           </div>
 
           <Card>
@@ -99,7 +106,11 @@ export default function ReportPage() {
                       {q.negotiated && q.priceBefore != null && (
                         <span className="text-sm text-muted-foreground line-through">${q.priceBefore.toLocaleString()}</span>
                       )}
-                      <span className="text-xl font-bold">${q.totalPrice.toLocaleString()}</span>
+                      {q.callOutcome === 'quoted' ? (
+                        <span className="text-xl font-bold">${q.totalPrice.toLocaleString()}</span>
+                      ) : (
+                        <span className="text-sm font-medium text-muted-foreground">no price given</span>
+                      )}
                     </span>
                   </CardTitle>
                 </CardHeader>
@@ -112,17 +123,37 @@ export default function ReportPage() {
                     <Badge variant="secondary">{q.callOutcome}</Badge>
                   </div>
                   {q.redFlag && q.redFlagReason && <p className="text-sm text-red-600">{q.redFlagReason}</p>}
-                  <div className="rounded-md border p-3 text-sm">
-                    <div className="flex justify-between font-medium">
-                      <span>Base price</span><span>${q.basePrice.toLocaleString()}</span>
-                    </div>
-                    {q.lineItems.map((li, j) => (
-                      <div key={j} className="flex justify-between text-muted-foreground">
-                        <span>{li.label}</span>
-                        <span>{li.amount == null ? 'undisclosed' : `$${li.amount.toLocaleString()}`}</span>
+                  {q.callOutcome === 'quoted' ? (
+                    <div className="rounded-md border p-3 text-sm">
+                      <div className="flex justify-between font-medium">
+                        <span>Base price</span><span>${q.basePrice.toLocaleString()}</span>
                       </div>
-                    ))}
-                  </div>
+                      {q.lineItems.map((li, j) => (
+                        <div key={j} className="flex justify-between text-muted-foreground">
+                          <span>{li.label}</span>
+                          <span>{li.amount == null ? 'undisclosed' : `$${li.amount.toLocaleString()}`}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      Wouldn&apos;t price it over the phone — logged as a{' '}
+                      {q.callOutcome === 'callback' ? 'callback commitment' : 'documented decline'}, not a
+                      vague range.
+                    </p>
+                  )}
+                  {txOf(q)?.conversationId && (
+                    <div className="text-sm">
+                      <p className="mb-1 text-muted-foreground">Call recording</p>
+                      <audio
+                        controls
+                        preload="none"
+                        className="w-full"
+                        src={`/api/recording?id=${txOf(q)!.conversationId}`}
+                        onError={(e) => { (e.currentTarget.parentElement as HTMLElement).hidden = true; }}
+                      />
+                    </div>
+                  )}
                   {txOf(q) && (
                     <details className="text-sm">
                       <summary className="cursor-pointer text-muted-foreground hover:text-foreground">

@@ -18,6 +18,8 @@ type CallState = {
 };
 
 const idle = (): CallState => ({ status: 'idle', turns: [], quote: null });
+const idleAll = () =>
+  Object.fromEntries(SELLERS.map((s) => [s.persona, idle()])) as Record<Persona, CallState>;
 
 // The showcased call: the ElevenLabs negotiator agent speaks out loud; the simulated
 // "tough" seller replies are generated server-side and fed in as text.
@@ -27,6 +29,7 @@ function ShowcaseCall() {
   const [quote, setQuote] = useState<Quote | null>(null);
   const [error, setError] = useState('');
   const turnsRef = useRef<TranscriptTurn[]>([]);
+  const convIdRef = useRef(''); // ElevenLabs conversation id — lets the report link the recording
   const gate = useSpeechGate();
   const push = (t: TranscriptTurn) => {
     turnsRef.current = [...turnsRef.current, t];
@@ -80,6 +83,7 @@ function ShowcaseCall() {
       const { token, error } = await res.json();
       if (!res.ok) throw new Error(error);
       await conversation.startSession({ conversationToken: token });
+      convIdRef.current = conversation.getId();
       const spec = (await (await fetch('/api/jobspec')).json()).at(-1);
       conversation.sendContextualUpdate(
         `Confirmed job spec for this call (your only source of truth): ${JSON.stringify(spec)}. You are calling the mover "Bay Area Van Lines".`
@@ -98,7 +102,7 @@ function ShowcaseCall() {
       const res = await fetch('/api/showcase-complete', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ turns: turnsRef.current }),
+        body: JSON.stringify({ turns: turnsRef.current, conversationId: convIdRef.current || undefined }),
       });
       const j = await res.json();
       if (!res.ok) throw new Error(j.error);
@@ -159,9 +163,7 @@ function ShowcaseCall() {
 }
 
 export default function CallsPage() {
-  const [calls, setCalls] = useState<Record<Persona, CallState>>({
-    lowballer: idle(), upseller: idle(), tough: idle(),
-  });
+  const [calls, setCalls] = useState<Record<Persona, CallState>>(idleAll);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState('');
   const [demoStep, setDemoStep] = useState('');
@@ -176,7 +178,7 @@ export default function CallsPage() {
   }, []);
 
   async function runDemo() {
-    setDemoStep('Calling 3 movers…');
+    setDemoStep(`Calling ${SELLERS.length} movers…`);
     const ok = await run();
     if (!ok) return setDemoStep('');
     setDemoStep('Calls done — generating the ranked report…');
@@ -191,7 +193,7 @@ export default function CallsPage() {
   async function run(): Promise<boolean> {
     setRunning(true);
     setError('');
-    setCalls({ lowballer: idle(), upseller: idle(), tough: idle() });
+    setCalls(idleAll());
     try {
       const res = await fetch('/api/calls/run', { method: 'POST' });
       if (!res.ok || !res.body) throw new Error((await res.text()) || `HTTP ${res.status}`);
@@ -237,16 +239,46 @@ export default function CallsPage() {
         <h1 className="text-3xl font-bold tracking-tight">Calls</h1>
         <span className="flex items-center gap-3">
           {demoStep && <span className="text-sm font-medium text-indigo-600">{demoStep}</span>}
-          <Button onClick={run} disabled={running}>{running ? 'Calling…' : 'Run 3 calls'}</Button>
+          <Button onClick={run} disabled={running}>{running ? 'Calling…' : `Run ${SELLERS.length} calls`}</Button>
         </span>
       </div>
       {error && <p className="text-sm text-red-500">{error}</p>}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">
+            Call list — {vertical.discovery.candidates.length} movers found via {vertical.discovery.source}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <p className="text-xs text-muted-foreground">
+            Query: &ldquo;{vertical.discovery.query}&rdquo; — the {SELLERS.length}{' '}
+            highlighted below are on today&apos;s call sheet.
+          </p>
+          <div className="grid grid-cols-2 gap-x-8 gap-y-1 text-sm">
+            {vertical.discovery.candidates.map((c) => {
+              const calling = SELLERS.some((s) => s.name === c.name);
+              return (
+                <div key={c.name} className="flex items-center justify-between gap-2">
+                  <span className={calling ? 'font-medium' : 'text-muted-foreground'}>
+                    {c.name}{' '}
+                    <span className="text-xs text-muted-foreground">★ {c.rating.toFixed(1)} ({c.reviews})</span>
+                  </span>
+                  {calling
+                    ? <Badge variant="outline">calling</Badge>
+                    : <span className="text-xs text-muted-foreground">{c.phone}</span>}
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
 
       <ConversationProvider>
         <ShowcaseCall />
       </ConversationProvider>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
         {SELLERS.map(({ persona, name }) => {
           const c = calls[persona];
           return (
@@ -278,7 +310,11 @@ export default function CallsPage() {
                 {c.quote && (
                   <div className="space-y-1 rounded-md border p-3 text-sm">
                     <div className="flex items-center justify-between font-semibold">
-                      <span>${c.quote.totalPrice.toLocaleString()}</span>
+                      <span>
+                        {c.quote.callOutcome === 'quoted'
+                          ? `$${c.quote.totalPrice.toLocaleString()}`
+                          : 'no price given'}
+                      </span>
                       <span className="flex gap-1">
                         {c.quote.negotiated && c.quote.priceBefore != null && (
                           <Badge>${c.quote.priceBefore.toLocaleString()} → ${c.quote.priceAfter?.toLocaleString()}</Badge>

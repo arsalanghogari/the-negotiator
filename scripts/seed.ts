@@ -1,4 +1,4 @@
-// Seeds a demo JobSpec + 3 persona transcripts so M3+ can be built without live voice.
+// Seeds a demo JobSpec + 4 persona transcripts so M3+ can be built without live voice.
 // Run: npm run seed
 import { readAll, writeAll } from '../lib/store.ts';
 import { demoJobSpec as jobSpec } from '../lib/demo.ts';
@@ -20,6 +20,19 @@ const transcripts: Transcript[] = [
       { speaker: 'negotiator', text: 'Understood. Is the $1,500 a binding quote?' },
       { speaker: 'seller', text: "It's an estimate. Final number is settled after the walkthrough on moving day." },
       { speaker: 'negotiator', text: "Okay, I have the $1,500 non-binding estimate with unspecified fees for stairs, piano, and materials. I'll compare and call back. Thanks." },
+    ],
+  },
+  {
+    transcriptId: 'tx-demo-stonewaller',
+    jobId: 'job-demo-1',
+    persona: 'stonewaller',
+    providerName: 'South Bay Moving & Storage',
+    turns: [
+      { speaker: 'negotiator', text: "Hi, I'm calling to get a quote for a move on August 1st: 2-bedroom from San Francisco 94110 to San Jose 95112, about 45 miles. Third floor walk-up at origin, two flights of stairs, long carry from street parking, about 40 boxes, and large items including an upright piano, sofa, and fridge. No packing service needed." },
+      { speaker: 'seller', text: "Happy to help — but company policy is no phone quotes. Every move gets a free on-site estimate first; that piano and walk-up are exactly why. When could our estimator come by?" },
+      { speaker: 'negotiator', text: 'I understand. Could you give me even a rough range for a job like this, just so I can compare while I wait?' },
+      { speaker: 'seller', text: "I really can't put a number on it without seeing it — phone ranges are how people get burned. I can have our estimator call you back today to set up a visit." },
+      { speaker: 'negotiator', text: "Understood — no number over the phone. Please put us down for that estimator callback, and I'll compare against the written quotes I already have. Thanks." },
     ],
   },
   {
@@ -60,7 +73,7 @@ await writeAll('transcripts', transcripts);
 // Round-trip check.
 const specs = await readAll<JobSpec>('jobspecs');
 const txs = await readAll<Transcript>('transcripts');
-if (specs[0]?.jobId !== 'job-demo-1' || txs.length !== 3) {
+if (specs[0]?.jobId !== 'job-demo-1' || txs.length !== 4) {
   throw new Error('seed round-trip failed');
 }
 console.log(`Seeded 1 JobSpec + ${txs.length} transcripts via ${process.env.SUPABASE_URL ? 'Supabase' : 'local .data/'}`);

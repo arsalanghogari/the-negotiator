@@ -34,10 +34,15 @@ export async function POST() {
   if (b.quotes.length === 0) return Response.json({ error: 'no quotes — run calls first' }, { status: 400 });
   const { spec, quotes, transcripts } = b;
 
+  // Only calls that produced a price are recommendable; callbacks/declines still get ranked.
+  const recommendable = quotes.filter((q) => q.callOutcome === 'quoted');
   const schema = {
     type: 'object',
     properties: {
-      recommendedQuoteId: { type: 'string', enum: quotes.map((q) => q.quoteId) },
+      recommendedQuoteId: {
+        type: 'string',
+        enum: (recommendable.length ? recommendable : quotes).map((q) => q.quoteId),
+      },
       rationale: { type: 'string' },
       redFlags: {
         type: 'array',
@@ -61,6 +66,7 @@ export async function POST() {
         content: JSON.stringify({
           jobSpec: spec,
           marketMedian: vertical.marketMedian,
+          marketSource: vertical.marketSource,
           quotes,
           transcripts: transcripts.map((t) => ({
             transcriptId: t.transcriptId,
@@ -74,9 +80,12 @@ export async function POST() {
   const out = JSON.parse(res.choices[0].message.content ?? '{}');
 
   // Rank by desirability (deviation from spec's cost-sort, per user): recommended first,
-  // red-flagged last, price breaks ties. Deterministic, so it's code, not model judgment.
+  // red-flagged then no-price calls last, price breaks ties. Deterministic — code, not model judgment.
   const rank = (q: Quote) =>
-    (q.quoteId === out.recommendedQuoteId ? 0 : 1_000_000) + (q.redFlag ? 2_000_000 : 0) + q.totalPrice;
+    (q.quoteId === out.recommendedQuoteId ? 0 : 1_000_000) +
+    (q.redFlag ? 2_000_000 : 0) +
+    (q.callOutcome === 'quoted' ? 0 : 4_000_000) +
+    q.totalPrice;
   const report: Report = {
     jobId: spec.jobId,
     ranked: [...quotes].sort((a, b) => rank(a) - rank(b)),

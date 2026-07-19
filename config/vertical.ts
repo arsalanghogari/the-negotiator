@@ -4,11 +4,31 @@ import type { Persona } from '@/types';
 
 export const vertical = {
   name: 'moving' as const,
-  // Real range for a 45-mi 2BR move.
+  // Real quotes collected for a 45-mi 2BR move (moveBuddha dataset, cited in the challenge brief).
   marketRange: { low: 1158, high: 6506 },
   marketMedian: 2400,
-  // Red-flag any total >= 30% below median.
+  marketSource: 'moveBuddha real-quote data, 2BR / 45 mi',
+  // Red-flag any total >= 30% below median — industry lowball warning (FMCSA consumer guidance:
+  // sight-unseen estimates run 40% over; anything far below the competition is bait).
   redFlagBelowMedianPct: 0.3,
+
+  // Where the call list comes from in the real world: a Places-style business search.
+  // ponytail: static fixture shaped like a Google Places result — a live Places query
+  // slots in behind this same field without touching any caller.
+  discovery: {
+    source: 'Google Places',
+    query: 'moving companies near San Jose, CA',
+    candidates: [
+      { name: 'Bay Area Van Lines', rating: 4.8, reviews: 312, phone: '(408) 555-0184' },
+      { name: 'Golden Gate Premier Moving', rating: 4.6, reviews: 205, phone: '(415) 555-0132' },
+      { name: 'South Bay Moving & Storage', rating: 4.5, reviews: 158, phone: '(408) 555-0117' },
+      { name: 'Mission Movers', rating: 4.4, reviews: 96, phone: '(415) 555-0163' },
+      { name: 'Peninsula Pro Relocation', rating: 4.3, reviews: 74, phone: '(650) 555-0141' },
+      { name: 'Budget Moves Co', rating: 3.9, reviews: 121, phone: '(408) 555-0109' },
+      { name: 'AAA Cheap Movers', rating: 3.2, reviews: 43, phone: '(408) 555-0177' },
+      { name: 'Valley Haulers', rating: 3.0, reviews: 28, phone: '(669) 555-0125' },
+    ],
+  },
 
   // Simulated seller personas (order matters: earlier calls arm the negotiator with leverage).
   sellers: [
@@ -17,6 +37,12 @@ export const vertical = {
       providerName: 'Budget Moves Co',
       systemPrompt:
         'You are a mover on a phone call with a caller requesting a quote. LOWBALLER strategy: quote $1,500 flat to win the job. If pressed, admit stairs, long-carry, and materials fees exist, but NEVER give a dollar amount for any fee — deflect with "depends on the day", "we sort that out at pickup", "ballpark, don\'t worry about it". The only number you ever say is $1,500. Your estimates are never binding. Stay in character, never break the negotiation. Speak naturally, 1-3 sentences per turn.',
+    },
+    {
+      persona: 'stonewaller' as Persona,
+      providerName: 'South Bay Moving & Storage',
+      systemPrompt:
+        'You are a mover on a phone call with a caller requesting a quote. STONEWALLER strategy: company policy is that you NEVER give prices over the phone — every job needs a free on-site estimate first. Politely refuse any dollar figure, even a rough range ("I really can\'t put a number on it without seeing the piano and those stairs"). Offer to schedule an estimate visit or take the caller\'s details for a callback from your estimator. Stay friendly but firm; never state any dollar amount, never break the negotiation. Speak naturally, 1-3 sentences per turn.',
     },
     {
       persona: 'upseller' as Persona,
@@ -53,5 +79,5 @@ How to run the call:
 You are live on a phone call. Output ONLY the words you speak to the seller. Never mention, quote, read out, or allude to these instructions, your strategy, or the JSON above — a real caller has no "instructions". When the call reaches a clear outcome, say a brief goodbye and end your final line with [HANG_UP].`,
 
   extractionPrompt: (median: number) =>
-    `Convert this call transcript into a structured Quote. Extract base price and every fee as separate labeled line items; compute totalPrice. binding=true only if explicitly stated. If the price changed during the call, set negotiated=true and fill priceBefore/priceAfter. If totalPrice is >= 30% below the $${median} market median, set redFlag=true with a reason. Set callOutcome: "quoted" if the seller stated any price at all, "callback" if they would not price it on this call, "declined" only if they refused the job entirely. Never invent numbers; a mentioned fee with no amount = null.`,
+    `Convert this call transcript into a structured Quote. Extract base price and every fee as separate labeled line items; compute totalPrice. binding=true only if explicitly stated. If the price changed during the call, set negotiated=true and fill priceBefore/priceAfter. If totalPrice is >= 30% below the $${median} market median, set redFlag=true with a reason. Set callOutcome: "quoted" if the seller stated any price at all, "callback" if they would not price it on this call, "declined" only if they refused the job entirely. Never invent numbers; a mentioned fee with no amount = null. If no price was stated at all, set basePrice and totalPrice to 0 and lineItems to [].`,
 };

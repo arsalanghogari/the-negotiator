@@ -1,5 +1,5 @@
 export type HomeSize = 'studio' | '1br' | '2br' | '3br+';
-export type Persona = 'tough' | 'lowballer' | 'upseller';
+export type Persona = 'tough' | 'lowballer' | 'upseller' | 'stonewaller';
 export type CallOutcome = 'quoted' | 'callback' | 'declined';
 
 export interface JobSpec {
@@ -72,4 +72,5 @@ export interface Transcript {
   persona: Persona;
   providerName: string;
   turns: TranscriptTurn[];
+  conversationId?: string; // ElevenLabs conversation id (voice calls only) — powers the recording player
 }
