@@ -115,11 +115,13 @@ export default function IntakePage() {
       <VoiceIntake
         demo={demo}
         onSpec={(ex) => {
+          // The agent may return null for fields it didn't collect — nulls keep current
+          // values (same rule as document extraction), else inputs get value={null}.
           setSpec((s) => ({
             ...s,
-            ...ex,
-            origin: { ...s.origin, ...ex.origin },
-            destination: { ...s.destination, ...ex.destination },
+            ...prune(ex),
+            origin: { ...s.origin, ...prune(ex.origin) },
+            destination: { ...s.destination, ...prune(ex.destination) },
             jobId: demo ? 'job-demo-1' : s.jobId,
           }));
           setMessage(
