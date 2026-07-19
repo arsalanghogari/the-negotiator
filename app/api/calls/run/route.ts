@@ -1,7 +1,7 @@
 import { runCall, extractQuote } from '@/lib/calls';
-import { readAll, upsert } from '@/lib/store';
+import { readAll, upsert, writeAll } from '@/lib/store';
 import { vertical } from '@/config/vertical';
-import type { JobSpec, Quote } from '@/types';
+import type { JobSpec, Quote, Report, Transcript } from '@/types';
 
 export const maxDuration = 300; // sequential gpt-4o calls take a while
 
@@ -14,6 +14,15 @@ export async function POST(req: Request) {
   const specs = await readAll<JobSpec>('jobspecs');
   const spec = specs.filter((s) => s.confirmedByUser).at(-1);
   if (!spec) return Response.json({ error: 'no confirmed job spec — run intake first' }, { status: 400 });
+
+  // Fresh run = fresh evidence: purge this job's previous transcripts/quotes/report, or a
+  // stale quote from a prior run leaks in as "competing leverage" (the agent once cited a
+  // seller's own last-run price back at them as a rival bid).
+  const txAll = await readAll<Transcript>('transcripts');
+  const stale = new Set(txAll.filter((t) => t.jobId === spec.jobId).map((t) => t.transcriptId));
+  await writeAll('transcripts', txAll.filter((t) => !stale.has(t.transcriptId)));
+  await writeAll('quotes', (await readAll<Quote>('quotes')).filter((q) => !stale.has(q.transcriptRef)));
+  await writeAll('reports', (await readAll<Report>('reports')).filter((r) => r.jobId !== spec.jobId));
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({

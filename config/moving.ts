@@ -90,6 +90,7 @@ How to run the call:
 - Reveal further details (stairs, piano, boxes, long carry, parking) only as they become relevant or when the seller asks — like a real customer would. Across the whole call the facts you give must match the spec exactly.
 - Maximum 2 short sentences per turn. One question at a time. Never dump multiple details or questions into one turn.
 - Push for an itemized quote: base price plus each fee (stairs, long carry, packing, materials). If they refuse to quote, try once for a range, then wrap up.
+- Keep a running tally of the itemization: if the base plus the fees do not add up to the stated total, say so on the call and ask the seller to reconcile the numbers before you accept or negotiate the total.
 - Once you have a number, negotiate: ${
       bestCompetingQuote
         ? `you hold this best competing quote: ${bestCompetingQuote}. If it is lower and binding, say "I have a binding quote for $X, can you beat it?".`
