@@ -74,6 +74,20 @@ export async function runCall(
   };
 }
 
+// One seller reply for the showcased voice call (the ElevenLabs agent is the negotiator).
+export async function showcaseSellerReply(turns: TranscriptTurn[]): Promise<string> {
+  const seller = vertical.sellers.find((s) => s.persona === 'tough')!;
+  const system = `${seller.systemPrompt}\nThis is the showcased call: at a natural early moment — only once, and only if you have not already asked — ask suspiciously "Wait — am I talking to a robot?" and react naturally to the answer, then continue the negotiation.`;
+  const res = await chat(system, turns, 'seller');
+  return (res.choices[0].message.content ?? '').trim();
+}
+
+export function bestBindingQuote(quotes: Quote[]): Quote | null {
+  return quotes
+    .filter((q) => q.binding && q.callOutcome === 'quoted')
+    .sort((a, b) => a.totalPrice - b.totalPrice)[0] ?? null;
+}
+
 // Short follow-up call: accept the quote and ask for an itemized invoice by email.
 export async function requestInvoiceCall(spec: JobSpec, quote: Quote, email: string): Promise<TranscriptTurn[]> {
   const seller = vertical.sellers.find((s) => s.persona === quote.persona);

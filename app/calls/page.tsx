@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import { ConversationProvider, useConversation } from '@elevenlabs/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -16,6 +17,138 @@ type CallState = {
 };
 
 const idle = (): CallState => ({ status: 'idle', turns: [], quote: null });
+
+// The showcased call: the ElevenLabs negotiator agent speaks out loud; the simulated
+// "tough" seller replies are generated server-side and fed in as text.
+function ShowcaseCall() {
+  const [turns, setTurns] = useState<TranscriptTurn[]>([]);
+  const [phase, setPhase] = useState<'idle' | 'live' | 'saving' | 'done'>('idle');
+  const [quote, setQuote] = useState<Quote | null>(null);
+  const [error, setError] = useState('');
+  const turnsRef = useRef<TranscriptTurn[]>([]);
+  const push = (t: TranscriptTurn) => {
+    turnsRef.current = [...turnsRef.current, t];
+    setTurns(turnsRef.current);
+  };
+
+  const conversation = useConversation({
+    micMuted: true, // no human on this call; the seller feeds in as text
+    clientTools: {
+      get_best_competing_quote: async () => JSON.stringify(await (await fetch('/api/best-quote')).json()),
+      log_quote: (p: { quote_json: string }) => {
+        void p; // the authoritative Quote comes from transcript extraction on save
+        setTimeout(finish, 4000); // let the goodbye line play out
+        return 'logged';
+      },
+    },
+    onMessage: async ({ source, message }: { source: string; message: string }) => {
+      if (source !== 'ai' || !message) return;
+      push({ speaker: 'negotiator', text: message });
+      try {
+        const res = await fetch('/api/seller-reply', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ turns: turnsRef.current }),
+        });
+        const { text } = await res.json();
+        push({ speaker: 'seller', text });
+        conversation.sendUserMessage(text);
+      } catch (e) {
+        setError(String(e));
+      }
+    },
+    onError: (e: unknown) => setError(String(e)),
+  });
+
+  async function start() {
+    setError('');
+    setQuote(null);
+    turnsRef.current = [];
+    setTurns([]);
+    try {
+      // Mic is muted for this call anyway (seller feeds in as text) — don't block on denial.
+      await navigator.mediaDevices.getUserMedia({ audio: true }).catch(() => {});
+      const res = await fetch('/api/voice-token?agent=negotiator');
+      const { token, error } = await res.json();
+      if (!res.ok) throw new Error(error);
+      await conversation.startSession({ conversationToken: token });
+      const spec = (await (await fetch('/api/jobspec')).json()).at(-1);
+      conversation.sendContextualUpdate(
+        `Confirmed job spec for this call (your only source of truth): ${JSON.stringify(spec)}. You are calling the mover "Bay Area Van Lines".`
+      );
+      setPhase('live');
+    } catch (e) {
+      setError(String(e));
+    }
+  }
+
+  async function finish() {
+    if (turnsRef.current.length < 2) return;
+    setPhase('saving');
+    try {
+      conversation.endSession();
+      const res = await fetch('/api/showcase-complete', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ turns: turnsRef.current }),
+      });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error);
+      setQuote(j.quote);
+      setPhase('done');
+    } catch (e) {
+      setError(String(e));
+      setPhase('idle');
+    }
+  }
+
+  return (
+    <Card className="border-indigo-600">
+      <CardHeader>
+        <CardTitle className="flex items-center justify-between text-base">
+          <span>Showcase call — Bay Area Van Lines, live ElevenLabs voice 🔊</span>
+          <span className="flex items-center gap-2">
+            {phase === 'live' && (
+              <Badge variant="secondary">{conversation.isSpeaking ? 'negotiator speaking…' : 'on call'}</Badge>
+            )}
+            <Button
+              size="sm"
+              variant={phase === 'live' ? 'destructive' : 'default'}
+              onClick={phase === 'live' ? finish : start}
+              disabled={phase === 'saving'}
+            >
+              {phase === 'live' ? 'End & save' : phase === 'saving' ? 'Saving…' : 'Start voice call'}
+            </Button>
+          </span>
+        </CardTitle>
+      </CardHeader>
+      {(turns.length > 0 || error) && (
+        <CardContent className="space-y-3">
+          {error && <p className="text-sm text-red-500">{error}</p>}
+          {turns.length > 0 && (
+            <div className="max-h-56 space-y-2 overflow-y-auto rounded-md border p-3 text-sm">
+              {turns.map((t, i) => (
+                <p key={i}>
+                  <span className={t.speaker === 'negotiator' ? 'font-semibold text-indigo-600' : 'font-semibold'}>
+                    {t.speaker === 'negotiator' ? '🔊 Negotiator' : 'Seller'}:
+                  </span>{' '}
+                  {t.text}
+                </p>
+              ))}
+            </div>
+          )}
+          {quote && (
+            <p className="text-sm font-medium">
+              Saved: ${quote.totalPrice.toLocaleString()} {quote.binding && '(binding)'}
+              {quote.negotiated && quote.priceBefore != null &&
+                ` — negotiated ${quote.priceBefore.toLocaleString()} → ${quote.priceAfter?.toLocaleString()}`}
+            </p>
+          )}
+        </CardContent>
+      )}
+    </Card>
+  );
+}
 
 export default function CallsPage() {
   const [calls, setCalls] = useState<Record<Persona, CallState>>({
@@ -73,6 +206,10 @@ export default function CallsPage() {
         <Button onClick={run} disabled={running}>{running ? 'Calling…' : 'Run 3 calls'}</Button>
       </div>
       {error && <p className="text-sm text-red-500">{error}</p>}
+
+      <ConversationProvider>
+        <ShowcaseCall />
+      </ConversationProvider>
 
       <div className="grid grid-cols-3 gap-4">
         {SELLERS.map(({ persona, name }) => {
