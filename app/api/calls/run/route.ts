@@ -7,7 +7,10 @@ export const maxDuration = 300; // sequential gpt-4o calls take a while
 
 // Streams NDJSON events: {type:'status'|'turn'|'quote'|'error', ...}
 // Sequential by design (spec §1); parallelism would go here if ever needed.
-export async function POST() {
+export async function POST(req: Request) {
+  // Demo mode excludes 'tough' — that call runs audibly as the listen-in voice call instead.
+  const body = (await req.json().catch(() => ({}))) as { exclude?: string };
+  const sellers = vertical.sellers.filter((s) => s.persona !== body.exclude);
   const specs = await readAll<JobSpec>('jobspecs');
   const spec = specs.filter((s) => s.confirmedByUser).at(-1);
   if (!spec) return Response.json({ error: 'no confirmed job spec — run intake first' }, { status: 400 });
@@ -18,7 +21,7 @@ export async function POST() {
       const emit = (o: object) => controller.enqueue(encoder.encode(JSON.stringify(o) + '\n'));
       try {
         let best: Quote | null = null;
-        for (const seller of vertical.sellers) {
+        for (const seller of sellers) {
           emit({ type: 'status', persona: seller.persona, status: 'calling' });
           const transcript = await runCall(spec, seller, best, (turn) =>
             emit({ type: 'turn', persona: seller.persona, ...turn })

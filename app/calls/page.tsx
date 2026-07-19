@@ -21,9 +21,10 @@ const idle = (): CallState => ({ status: 'idle', turns: [], quote: null });
 const idleAll = () =>
   Object.fromEntries(SELLERS.map((s) => [s.persona, idle()])) as Record<Persona, CallState>;
 
-// The showcased call: the ElevenLabs negotiator agent speaks out loud; the simulated
-// "tough" seller replies are generated server-side and fed in as text.
-function ShowcaseCall() {
+// The listen-in call: the ElevenLabs negotiator agent speaks out loud; the simulated
+// "tough" seller replies are generated server-side, spoken via TTS, then fed in as text.
+// `auto` starts the call without a click (demo flow); `onSaved` fires once it's saved.
+function ShowcaseCall({ auto = false, onSaved }: { auto?: boolean; onSaved?: () => void }) {
   const [turns, setTurns] = useState<TranscriptTurn[]>([]);
   const [phase, setPhase] = useState<'idle' | 'live' | 'saving' | 'done'>('idle');
   const [quote, setQuote] = useState<Quote | null>(null);
@@ -31,6 +32,7 @@ function ShowcaseCall() {
   const [sellerSpeaking, setSellerSpeaking] = useState(false);
   const turnsRef = useRef<TranscriptTurn[]>([]);
   const convIdRef = useRef(''); // ElevenLabs conversation id — lets the report link the recording
+  const specRef = useRef(''); // job-spec JSON, fetched before connect, injected in onConnect
   const sellerAudioRef = useRef<HTMLAudioElement | null>(null);
   const gate = useSpeechGate();
   const push = (t: TranscriptTurn) => {
@@ -67,6 +69,15 @@ function ShowcaseCall() {
 
   const conversation = useConversation({
     micMuted: true, // no human on this call; the seller feeds in as text
+    // startSession() returns before the session is connected — anything that needs a live
+    // conversation (id, contextual update) must wait for onConnect, or it throws.
+    onConnect: ({ conversationId }: { conversationId: string }) => {
+      convIdRef.current = conversationId;
+      conversation.sendContextualUpdate(
+        `Confirmed job spec for this call (your only source of truth): ${specRef.current}. You are calling the mover "Bay Area Van Lines".`
+      );
+      setPhase('live');
+    },
     clientTools: {
       get_best_competing_quote: async () => JSON.stringify(await (await fetch('/api/best-quote')).json()),
       log_quote: (p: { quote_json: string }) => {
@@ -101,6 +112,7 @@ function ShowcaseCall() {
   });
 
   async function start() {
+    if (phase !== 'idle') return;
     setError('');
     setQuote(null);
     turnsRef.current = [];
@@ -111,17 +123,20 @@ function ShowcaseCall() {
       const res = await fetch('/api/voice-token?agent=negotiator');
       const { token, error } = await res.json();
       if (!res.ok) throw new Error(error);
-      await conversation.startSession({ conversationToken: token });
-      convIdRef.current = conversation.getId();
       const spec = (await (await fetch('/api/jobspec')).json()).at(-1);
-      conversation.sendContextualUpdate(
-        `Confirmed job spec for this call (your only source of truth): ${JSON.stringify(spec)}. You are calling the mover "Bay Area Van Lines".`
-      );
-      setPhase('live');
+      specRef.current = JSON.stringify(spec);
+      // Fire-and-forget: onConnect takes it from here; failures surface via onError.
+      conversation.startSession({ conversationToken: token });
     } catch (e) {
       setError(String(e));
     }
   }
+
+  // Demo flow: auto-start the call once the fast text calls are done.
+  useEffect(() => {
+    if (auto) void start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auto]);
 
   async function finish() {
     if (turnsRef.current.length < 2) return;
@@ -138,6 +153,7 @@ function ShowcaseCall() {
       if (!res.ok) throw new Error(j.error);
       setQuote(j.quote);
       setPhase('done');
+      onSaved?.();
     } catch (e) {
       setError(String(e));
       setPhase('idle');
@@ -203,6 +219,7 @@ export default function CallsPage() {
   const [running, setRunning] = useState(false);
   const [error, setError] = useState('');
   const [demoStep, setDemoStep] = useState('');
+  const [voiceAuto, setVoiceAuto] = useState(false);
   const scrollRefs = useRef<Partial<Record<Persona, HTMLDivElement | null>>>({});
 
   // Run-demo flow: /calls?demo=1 auto-runs the calls, then generates the report and moves on.
@@ -213,10 +230,17 @@ export default function CallsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Demo: fast text calls first (they arm the negotiator with leverage), then the audible
+  // listen-in call against the tough seller; the report waits for that call to finish.
   async function runDemo() {
-    setDemoStep(`Calling ${SELLERS.length} movers…`);
-    const ok = await run();
+    setDemoStep(`Calling ${SELLERS.length - 1} movers…`);
+    const ok = await run('tough');
     if (!ok) return setDemoStep('');
+    setDemoStep('Now listen in — live voice negotiation with Bay Area Van Lines…');
+    setVoiceAuto(true); // ShowcaseCall auto-starts; onVoiceDone continues the demo
+  }
+
+  async function onVoiceDone() {
     setDemoStep('Calls done — generating the ranked report…');
     const res = await fetch('/api/report', { method: 'POST' });
     if (!res.ok) {
@@ -226,12 +250,16 @@ export default function CallsPage() {
     window.location.href = '/report';
   }
 
-  async function run(): Promise<boolean> {
+  async function run(exclude?: Persona): Promise<boolean> {
     setRunning(true);
     setError('');
     setCalls(idleAll());
     try {
-      const res = await fetch('/api/calls/run', { method: 'POST' });
+      const res = await fetch('/api/calls/run', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(exclude ? { exclude } : {}),
+      });
       if (!res.ok || !res.body) throw new Error((await res.text()) || `HTTP ${res.status}`);
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -275,7 +303,7 @@ export default function CallsPage() {
         <h1 className="text-3xl font-bold tracking-tight">Calls</h1>
         <span className="flex items-center gap-3">
           {demoStep && <span className="text-sm font-medium text-indigo-600">{demoStep}</span>}
-          <Button onClick={run} disabled={running}>{running ? 'Calling…' : `Run ${SELLERS.length} calls`}</Button>
+          <Button onClick={() => run()} disabled={running}>{running ? 'Calling…' : `Run ${SELLERS.length} calls`}</Button>
         </span>
       </div>
       {error && <p className="text-sm text-red-500">{error}</p>}
@@ -314,7 +342,7 @@ export default function CallsPage() {
       </Card>
 
       <ConversationProvider>
-        <ShowcaseCall />
+        <ShowcaseCall auto={voiceAuto} onSaved={voiceAuto ? onVoiceDone : undefined} />
       </ConversationProvider>
 
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
