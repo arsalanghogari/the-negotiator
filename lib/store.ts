@@ -49,7 +49,10 @@ export async function upsert<T extends { [k: string]: unknown }>(
 ): Promise<void> {
   const items = await readAll<T>(collection);
   const i = items.findIndex((x) => x[idKey] === item[idKey]);
-  if (i >= 0) items[i] = item;
-  else items.push(item);
+  if (i >= 0) items.splice(i, 1);
+  // Always append: consumers treat "last in the collection" as most recent, so a
+  // re-upserted item (e.g. re-arming the demo job spec) must move to the end —
+  // replacing in place left an older spec looking like the active one.
+  items.push(item);
   await writeAll(collection, items);
 }
