@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { vertical } from '@/config/vertical';
-import type { InvoiceRequest, JobSpec, Quote, Report, Transcript } from '@/types';
+import type { InvoiceRequest, JobSpec, Quote, Report, Transcript, TranscriptTurn } from '@/types';
 
 type Bundle = { report: Report | null; transcripts: Transcript[]; spec: JobSpec };
 
@@ -34,13 +34,14 @@ export default function ReportPage() {
   const report = data?.report;
   const recommended = report?.ranked.find((q) => q.quoteId === report.recommendedQuoteId);
   const txOf = (q: Quote) => data?.transcripts.find((t) => t.transcriptId === q.transcriptRef);
-  // Brand role: highest quoted price renders in Overpay Red.
+  // Brand role: highest quoted price renders in Overpay Red — but never the recommended
+  // pick, whose role (Signal) wins.
   const highestQuoteId = report?.ranked
-    .filter((q) => q.callOutcome === 'quoted')
+    .filter((q) => q.callOutcome === 'quoted' && q.quoteId !== report.recommendedQuoteId)
     .sort((a, b) => b.totalPrice - a.totalPrice)[0]?.quoteId;
 
   return (
-    <main className="mx-auto max-w-4xl space-y-6 p-8">
+    <main className="mx-auto max-w-6xl space-y-6 p-8">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Report</h1>
         <Button onClick={() => load('POST')} disabled={busy}>
@@ -53,7 +54,8 @@ export default function ReportPage() {
       )}
 
       {report && recommended && (
-        <>
+        <div className="grid items-start gap-6 lg:grid-cols-[1fr_400px]">
+          <div className="space-y-6">
           <div
             className="rounded-[18px] bg-ink p-6 text-white"
             style={{
@@ -96,10 +98,6 @@ export default function ReportPage() {
               )}
             </CardContent>
           </Card>
-
-          <TakeAction report={report} defaultEmail={data?.spec.contactEmail ?? ''} />
-
-          <AskAnything />
 
           <div className="space-y-4">
             {report.ranked.map((q, i) => (
@@ -184,8 +182,13 @@ export default function ReportPage() {
               </Card>
             ))}
           </div>
+          </div>
 
-        </>
+          <div className="space-y-6 lg:sticky lg:top-6">
+            <TakeAction report={report} defaultEmail={data?.spec.contactEmail ?? ''} />
+            <AskAnything />
+          </div>
+        </div>
       )}
     </main>
   );
@@ -260,72 +263,139 @@ function TakeAction({ report, defaultEmail }: { report: Report; defaultEmail: st
   const quotable = report.ranked.filter((q) => q.callOutcome === 'quoted');
   const [quoteId, setQuoteId] = useState(report.recommendedQuoteId);
   const [email, setEmail] = useState(defaultEmail);
-  const [busy, setBusy] = useState(false);
+  const [phase, setPhase] = useState<'idle' | 'calling' | 'done'>('idle');
+  const [visible, setVisible] = useState<TranscriptTurn[]>([]);
+  const [listening, setListening] = useState(false);
   const [result, setResult] = useState<InvoiceRequest | null>(null);
   const [error, setError] = useState('');
+  // Ref so flipping the toggle mid-call affects the NEXT turn — joining/leaving live.
+  const listenRef = useRef(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  function toggleListen() {
+    listenRef.current = !listenRef.current;
+    setListening(listenRef.current);
+    if (!listenRef.current) audioRef.current?.pause();
+  }
+
+  // Voice one turn via TTS (negotiator voice matches the live agent); resolve when played.
+  function speak(t: TranscriptTurn): Promise<void> {
+    return new Promise((resolve) => {
+      const done = (a?: HTMLAudioElement) => {
+        if (a) URL.revokeObjectURL(a.src);
+        audioRef.current = null;
+        resolve();
+      };
+      (async () => {
+        const res = await fetch('/api/tts', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ text: t.text, voice: t.speaker }),
+        });
+        if (!res.ok) throw new Error();
+        const audio = new Audio(URL.createObjectURL(await res.blob()));
+        audioRef.current = audio;
+        audio.onended = () => done(audio);
+        audio.onerror = () => done(audio);
+        await audio.play();
+      })().catch(() => done());
+    });
+  }
 
   async function go() {
-    setBusy(true);
+    setPhase('calling');
     setError('');
     setResult(null);
+    setVisible([]);
     try {
       const res = await fetch('/api/take-action', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ quoteId, email }),
       });
-      const j = await res.json();
+      const j = (await res.json()) as InvoiceRequest & { error?: string };
       if (!res.ok) throw new Error(j.error ?? `HTTP ${res.status}`);
+      // The call proceeds on its own; if the user has joined, each turn plays out loud
+      // before the next lands, otherwise turns land at a natural reading pace.
+      for (const t of j.turns) {
+        setVisible((v) => [...v, t]);
+        if (listenRef.current) await speak(t);
+        else await new Promise((r) => setTimeout(r, 900));
+      }
       setResult(j);
+      setPhase('done');
     } catch (e) {
       setError(String(e));
-    } finally {
-      setBusy(false);
+      setPhase('idle');
     }
   }
 
   return (
     <Card>
-      <CardHeader><CardTitle className="text-lg">Take action</CardTitle></CardHeader>
-      <CardContent className="space-y-3">
+      <CardHeader>
+        <CardTitle className="flex items-center justify-between text-lg">
+          <span>Take action</span>
+          {phase === 'calling' && (
+            <Badge className="gap-1.5 bg-signal/20 font-mono text-xs text-foreground">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-signal-deep" />
+              on call
+            </Badge>
+          )}
+        </CardTitle>
         <p className="text-sm text-muted-foreground">
-          Book the move: the negotiator calls the seller back and asks for an itemized invoice by email.
+          Parley calls the seller back to book and request the itemized invoice by email. It
+          works on its own — join in and listen whenever you like.
           {/* ponytail: DEMO_MODE — the seller is simulated, so no real email is sent. */}
         </p>
-        <div className="flex flex-wrap items-center gap-3">
-          <select
-            className="h-9 rounded-md border bg-transparent px-2 text-sm"
-            value={quoteId}
-            onChange={(e) => { setQuoteId(e.target.value); setResult(null); }}
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <select
+          className="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
+          value={quoteId}
+          onChange={(e) => { setQuoteId(e.target.value); setResult(null); }}
+          disabled={phase === 'calling'}
+        >
+          {quotable.map((q) => (
+            <option key={q.quoteId} value={q.quoteId}>
+              {q.providerName} — ${q.totalPrice.toLocaleString()}{q.quoteId === report.recommendedQuoteId ? ' (recommended)' : ''}
+            </option>
+          ))}
+        </select>
+        <Input
+          type="email"
+          placeholder="you@example.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          disabled={phase === 'calling'}
+        />
+        <div className="flex items-center gap-2">
+          <Button onClick={go} disabled={phase === 'calling' || !email.includes('@')}>
+            {phase === 'calling' ? 'Calling seller…' : 'Book & request invoice'}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={toggleListen}
+            className={listening ? 'border-signal-deep text-signal-deep' : ''}
           >
-            {quotable.map((q) => (
-              <option key={q.quoteId} value={q.quoteId}>
-                {q.providerName} — ${q.totalPrice.toLocaleString()}{q.quoteId === report.recommendedQuoteId ? ' (recommended)' : ''}
-              </option>
-            ))}
-          </select>
-          <Input
-            type="email"
-            placeholder="you@example.com"
-            className="w-64"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-          <Button onClick={go} disabled={busy || !email.includes('@')}>
-            {busy ? 'Calling seller…' : 'Request invoice'}
+            {listening ? '🔊 Listening' : '🔇 Listen in'}
           </Button>
         </div>
-        {error && <p className="text-sm text-red-500">{error}</p>}
-        {result && (
+        {error && <p className="text-sm text-red-brand">{error}</p>}
+        {visible.length > 0 && (
           <div className="space-y-2 rounded-md border p-3 text-sm">
-            <p className="font-medium text-signal-deep">
-              Invoice requested from {result.providerName} → {result.email}
-            </p>
-            {result.turns.map((t, i) => (
+            {visible.map((t, i) => (
               <p key={i}>
-                <span className="font-semibold">{t.speaker === 'negotiator' ? 'Negotiator' : 'Seller'}:</span> {t.text}
+                <span className={t.speaker === 'negotiator' ? 'font-semibold text-signal-deep' : 'font-semibold'}>
+                  {t.speaker === 'negotiator' ? 'Negotiator' : 'Seller'}:
+                </span>{' '}
+                {t.text}
               </p>
             ))}
+            {result && (
+              <p className="pt-1 font-medium text-signal-deep">
+                ✓ Booked with {result.providerName} — invoice to {result.email}
+              </p>
+            )}
           </div>
         )}
       </CardContent>
