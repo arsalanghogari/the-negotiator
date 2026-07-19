@@ -26,18 +26,24 @@ function ShowcaseCall() {
   const [quote, setQuote] = useState<Quote | null>(null);
   const [error, setError] = useState('');
   const turnsRef = useRef<TranscriptTurn[]>([]);
+  // The gate: closed from the moment a negotiator message arrives until its audio has
+  // BOTH started and finished. Checking "speaking right now" isn't enough — the seller
+  // reply can arrive before TTS starts and barge in.
   const speakingRef = useRef(false);
+  const awaitingSpeechRef = useRef(false);
   const pendingReplyRef = useRef<string | null>(null);
   const push = (t: TranscriptTurn) => {
     turnsRef.current = [...turnsRef.current, t];
     setTurns(turnsRef.current);
   };
 
-  // Sending a user message while the agent is speaking barges in and cuts it off
-  // mid-sentence — hold the seller's reply until the agent finishes, then send.
+  function gateOpen() {
+    return !speakingRef.current && !awaitingSpeechRef.current;
+  }
+
   function flushReply() {
     const text = pendingReplyRef.current;
-    if (!text || speakingRef.current) return;
+    if (!text || !gateOpen()) return;
     pendingReplyRef.current = null;
     setTimeout(() => {
       if (turnsRef.current.length === 0) return; // call was ended/reset meanwhile
@@ -58,11 +64,27 @@ function ShowcaseCall() {
       },
     },
     onModeChange: ({ mode }: { mode: string }) => {
-      speakingRef.current = mode === 'speaking';
-      if (mode !== 'speaking') flushReply();
+      if (mode === 'speaking') {
+        speakingRef.current = true;
+        awaitingSpeechRef.current = false; // speech started — half the cycle done
+      } else {
+        speakingRef.current = false;
+        flushReply(); // speech ended — gate opens (unless still awaiting a fresh turn's audio)
+      }
     },
     onMessage: async ({ source, message }: { source: string; message: string }) => {
       if (source !== 'ai' || !message) return;
+      // Close the gate until this turn's audio has played (unless it's already playing).
+      if (!speakingRef.current) {
+        awaitingSpeechRef.current = true;
+        // Failsafe: if no audio ever starts (shouldn't happen), don't deadlock the call.
+        setTimeout(() => {
+          if (awaitingSpeechRef.current) {
+            awaitingSpeechRef.current = false;
+            flushReply();
+          }
+        }, 8000);
+      }
       push({ speaker: 'negotiator', text: message });
       try {
         const res = await fetch('/api/seller-reply', {
@@ -72,7 +94,7 @@ function ShowcaseCall() {
         });
         const { text } = await res.json();
         pendingReplyRef.current = text;
-        flushReply(); // sends now if the agent already finished speaking
+        flushReply(); // no-op unless the gate is already open
       } catch (e) {
         setError(String(e));
       }
