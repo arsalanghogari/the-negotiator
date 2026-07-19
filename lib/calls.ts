@@ -37,9 +37,13 @@ export async function runCall(
     : null;
   const negotiatorSystem = vertical.negotiatorPrompt(JSON.stringify(spec), best);
   // Deterministic opener: identical job intro on every call, and no first-turn monologues.
+  const spokenDate = new Date(`${spec.preferredDate}T00:00:00`).toLocaleDateString('en-US', {
+    month: 'long', day: 'numeric', year: 'numeric',
+  });
+  const spokenSize = { studio: 'studio', '1br': 'one-bedroom', '2br': 'two-bedroom', '3br+': 'three-plus-bedroom' }[spec.homeSize];
   const opener: TranscriptTurn = {
     speaker: 'negotiator',
-    text: `Hi, I'm calling to get a quote for a move on ${spec.preferredDate}: a ${spec.homeSize} from ${spec.origin.city} to ${spec.destination.city}. Could you help me with that?`,
+    text: `Hi, I'm calling to get a quote for a move on ${spokenDate}: a ${spokenSize} from ${spec.origin.city} to ${spec.destination.city}. Could you help me with that?`,
   };
   const turns: TranscriptTurn[] = [opener];
   onTurn(opener);
