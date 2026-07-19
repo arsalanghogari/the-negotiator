@@ -319,7 +319,7 @@ function VoiceIntakeInner({ demo, onSpec }: { demo: boolean; onSpec: (spec: Part
 
   const live = conversation.status === 'connected';
   return (
-    <Card className={demo ? 'border-indigo-600' : ''}>
+    <Card className={demo ? 'border-signal-deep' : ''}>
       <CardHeader>
         <CardTitle>{demo ? 'Voice interview — demo customer 🔊' : 'Voice interview'}</CardTitle>
       </CardHeader>

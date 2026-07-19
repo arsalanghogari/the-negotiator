@@ -200,13 +200,14 @@ function ShowcaseCall({
   }
 
   return (
-    <Card className="border-indigo-600">
+    <Card className="border-ink bg-ink text-white">
       <CardHeader>
         <CardTitle className="flex items-center justify-between text-base">
           <span>Listen in — Bay Area Van Lines, both sides live 🔊</span>
           <span className="flex items-center gap-2">
             {phase === 'live' && (
-              <Badge variant="secondary">
+              <Badge className="gap-1.5 bg-signal/15 font-mono text-signal">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-signal" />
                 {conversation.isSpeaking
                   ? 'negotiator speaking…'
                   : sellerSpeaking
@@ -227,12 +228,12 @@ function ShowcaseCall({
       </CardHeader>
       {(turns.length > 0 || error) && (
         <CardContent className="space-y-3">
-          {error && <p className="text-sm text-red-500">{error}</p>}
+          {error && <p className="text-sm text-red-brand">{error}</p>}
           {turns.length > 0 && (
-            <div className="max-h-56 space-y-2 overflow-y-auto rounded-md border p-3 text-sm">
+            <div className="max-h-56 space-y-2 overflow-y-auto rounded-md border border-white/15 p-3 text-sm">
               {turns.map((t, i) => (
-                <p key={i}>
-                  <span className={t.speaker === 'negotiator' ? 'font-semibold text-indigo-600' : 'font-semibold'}>
+                <p key={i} className={t.speaker === 'negotiator' ? '' : 'text-white/70'}>
+                  <span className={t.speaker === 'negotiator' ? 'font-semibold text-signal' : 'font-semibold'}>
                     {t.speaker === 'negotiator' ? '🔊 Negotiator' : 'Seller'}:
                   </span>{' '}
                   {t.text}
@@ -241,7 +242,7 @@ function ShowcaseCall({
             </div>
           )}
           {quote && (
-            <p className="text-sm font-medium">
+            <p className="font-mono text-sm font-medium text-signal">
               Saved: ${quote.totalPrice.toLocaleString()} {quote.binding && '(binding)'}
               {quote.negotiated && quote.priceBefore != null &&
                 ` — negotiated ${quote.priceBefore.toLocaleString()} → ${quote.priceAfter?.toLocaleString()}`}
@@ -341,7 +342,7 @@ export default function CallsPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Calls</h1>
         <span className="flex items-center gap-3">
-          {demoStep && <span className="text-sm font-medium text-indigo-600">{demoStep}</span>}
+          {demoStep && <span className="text-sm font-medium text-signal-deep">{demoStep}</span>}
           <Button onClick={() => run()} disabled={running}>{running ? 'Calling…' : `Run ${SELLERS.length} calls`}</Button>
         </span>
       </div>
@@ -367,10 +368,10 @@ export default function CallsPage() {
                 <div key={c.name} className="flex items-center justify-between gap-2">
                   <span className={onSheet ? 'font-medium' : 'text-muted-foreground'}>
                     {c.name}{' '}
-                    <span className="text-xs text-muted-foreground">★ {c.rating} ({c.reviews})</span>
+                    <span className="font-mono text-xs text-muted-foreground">★ {c.rating} ({c.reviews})</span>
                   </span>
                   <span className="flex shrink-0 items-center gap-2">
-                    <span className="text-xs text-muted-foreground">{c.phone}</span>
+                    <span className="font-mono text-xs text-muted-foreground">{c.phone}</span>
                     {onSheet && <Badge variant="outline">on call sheet</Badge>}
                   </span>
                 </div>
@@ -422,27 +423,27 @@ export default function CallsPage() {
                 {c.quote && (
                   <div className="space-y-1 rounded-md border p-3 text-sm">
                     <div className="flex items-center justify-between font-semibold">
-                      <span>
+                      <span className={c.quote.callOutcome === 'quoted' ? 'font-mono' : ''}>
                         {c.quote.callOutcome === 'quoted'
                           ? `$${c.quote.totalPrice.toLocaleString()}`
                           : 'no price given'}
                       </span>
                       <span className="flex gap-1">
                         {c.quote.negotiated && c.quote.priceBefore != null && (
-                          <Badge>${c.quote.priceBefore.toLocaleString()} → ${c.quote.priceAfter?.toLocaleString()}</Badge>
+                          <Badge className="font-mono">${c.quote.priceBefore.toLocaleString()} → ${c.quote.priceAfter?.toLocaleString()}</Badge>
                         )}
                         {c.quote.binding && <Badge variant="outline">binding</Badge>}
-                        {c.quote.redFlag && <Badge variant="destructive">red flag</Badge>}
-                        {c.quote.itemizationMismatch && <Badge variant="destructive">doesn&apos;t add up</Badge>}
+                        {c.quote.redFlag && <Badge className="border-amber bg-amber/15 text-foreground">⚑ red flag</Badge>}
+                        {c.quote.itemizationMismatch && <Badge className="border-amber bg-amber/15 text-foreground">⚑ doesn&apos;t add up</Badge>}
                       </span>
                     </div>
                     {c.quote.lineItems.map((li, i) => (
                       <div key={i} className="flex justify-between text-muted-foreground">
                         <span>{li.label}</span>
-                        <span>{li.amount == null ? '—' : `$${li.amount.toLocaleString()}`}</span>
+                        <span className="font-mono">{li.amount == null ? '—' : `$${li.amount.toLocaleString()}`}</span>
                       </div>
                     ))}
-                    <div className="text-xs text-muted-foreground">outcome: {c.quote.callOutcome}</div>
+                    <div className="font-mono text-xs text-muted-foreground">outcome: {c.quote.callOutcome}</div>
                   </div>
                 )}
               </CardContent>

@@ -12,29 +12,43 @@ export default function Home() {
   }
 
   return (
-    <main className="flex min-h-[80vh] flex-col items-center justify-center gap-6 px-8 text-center">
-      <h1 className="text-5xl font-bold tracking-tight">The Negotiator</h1>
-      <p className="max-w-xl text-lg text-muted-foreground">
-        The same move costs anywhere from $1,158 to $6,506. An AI agent that calls the movers,
-        compares itemized quotes, and negotiates the price down for you.
+    <main
+      className="flex min-h-[85vh] flex-col items-center justify-center gap-7 bg-ink px-8 text-center text-white"
+      style={{
+        backgroundImage:
+          'radial-gradient(640px 420px at 82% 0%, rgba(198,240,77,0.16), transparent)',
+      }}
+    >
+      <p className="font-mono text-xs uppercase tracking-[0.22em] text-signal">
+        Never overpay again
+      </p>
+      <h1 className="max-w-3xl font-display text-5xl font-bold leading-[1.08] tracking-[-0.02em] md:text-6xl">
+        The voice that haggles for you.
+      </h1>
+      <p className="max-w-xl text-lg leading-relaxed text-white/70">
+        The same 45-mile move quotes anywhere from{' '}
+        <span className="font-mono font-medium text-signal">$1,158</span> to{' '}
+        <span className="font-mono font-medium text-signal">$6,506</span>. Parley calls the
+        movers, compares itemized quotes, and negotiates the price down — with receipts.
       </p>
       <div className="flex gap-4">
-        <a
-          href="/intake"
-          className="rounded-md bg-foreground px-6 py-2.5 font-medium text-background hover:opacity-90"
-        >
-          Start intake
-        </a>
         <button
           onClick={runDemo}
           disabled={busy}
-          className="rounded-md border border-indigo-600 px-6 py-2.5 font-medium text-indigo-600 hover:bg-indigo-50 disabled:opacity-50 dark:hover:bg-indigo-950"
+          className="rounded-xl bg-signal px-6 py-3 font-semibold text-ink hover:brightness-105 disabled:opacity-50"
         >
           {busy ? 'Setting up…' : '▶ Run demo'}
         </button>
+        <a
+          href="/intake"
+          className="rounded-xl border-[1.5px] border-white/30 px-6 py-3 font-semibold text-white hover:border-white/60"
+        >
+          Start intake
+        </a>
       </div>
-      <p className="text-sm text-muted-foreground">
-        Run demo plays the whole loop: voice intake with a synthetic customer → 3 negotiation calls → ranked report.
+      <p className="text-sm text-white/50">
+        Run demo plays the whole loop: voice intake with a synthetic customer → negotiation
+        calls with one you can listen in on → ranked report.
       </p>
     </main>
   );

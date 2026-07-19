@@ -34,6 +34,10 @@ export default function ReportPage() {
   const report = data?.report;
   const recommended = report?.ranked.find((q) => q.quoteId === report.recommendedQuoteId);
   const txOf = (q: Quote) => data?.transcripts.find((t) => t.transcriptId === q.transcriptRef);
+  // Brand role: highest quoted price renders in Overpay Red.
+  const highestQuoteId = report?.ranked
+    .filter((q) => q.callOutcome === 'quoted')
+    .sort((a, b) => b.totalPrice - a.totalPrice)[0]?.quoteId;
 
   return (
     <main className="mx-auto max-w-4xl space-y-6 p-8">
@@ -50,21 +54,27 @@ export default function ReportPage() {
 
       {report && recommended && (
         <>
-          <div className="rounded-xl border-2 border-indigo-600 bg-indigo-50 p-6 dark:bg-indigo-950">
-            <p className="text-sm font-medium uppercase tracking-wide text-indigo-600">Our recommendation</p>
+          <div
+            className="rounded-[18px] bg-ink p-6 text-white"
+            style={{
+              backgroundImage:
+                'radial-gradient(420px 260px at 85% 0%, rgba(198,240,77,0.16), transparent)',
+            }}
+          >
+            <p className="font-mono text-xs uppercase tracking-[0.22em] text-signal">Our recommendation</p>
             <div className="mt-1 flex items-baseline justify-between">
-              <h2 className="text-2xl font-bold">{recommended.providerName}</h2>
-              <p className="text-3xl font-bold text-indigo-600">${recommended.totalPrice.toLocaleString()}</p>
+              <h2 className="font-display text-2xl font-bold">{recommended.providerName}</h2>
+              <p className="font-mono text-3xl font-bold text-signal">${recommended.totalPrice.toLocaleString()}</p>
             </div>
             <div className="mt-2 flex gap-2">
               {recommended.binding && <Badge>binding quote</Badge>}
               {recommended.negotiated && recommended.priceBefore != null && (
-                <Badge variant="secondary">
+                <Badge className="bg-white/10 font-mono text-white">
                   negotiated down: ${recommended.priceBefore.toLocaleString()} → ${recommended.priceAfter?.toLocaleString()}
                 </Badge>
               )}
             </div>
-            <p className="mt-3 text-xs text-muted-foreground">
+            <p className="mt-3 text-xs text-white/60">
               Market benchmark: ${vertical.marketMedian.toLocaleString()} median, observed range $
               {vertical.marketRange.low.toLocaleString()}–${vertical.marketRange.high.toLocaleString()} (
               {vertical.marketSource}). Red-flag rule: any quote ≥
@@ -77,9 +87,9 @@ export default function ReportPage() {
             <CardContent className="space-y-3">
               <p className="whitespace-pre-wrap text-sm leading-relaxed">{report.rationale}</p>
               {report.redFlags.length > 0 && (
-                <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm dark:border-red-900 dark:bg-red-950">
-                  <p className="font-medium text-red-600">Red flags</p>
-                  <ul className="mt-1 list-disc pl-5 text-red-600/90">
+                <div className="rounded-md border border-amber/50 bg-amber/10 p-3 text-sm">
+                  <p className="font-medium">⚑ Red flags</p>
+                  <ul className="mt-1 list-disc pl-5 text-foreground/80">
                     {report.redFlags.map((f, i) => <li key={i}>{f}</li>)}
                   </ul>
                 </div>
@@ -93,7 +103,7 @@ export default function ReportPage() {
 
           <div className="space-y-4">
             {report.ranked.map((q, i) => (
-              <Card key={q.quoteId} className={q.quoteId === report.recommendedQuoteId ? 'border-indigo-600' : ''}>
+              <Card key={q.quoteId} className={q.quoteId === report.recommendedQuoteId ? 'border-signal-deep' : ''}>
                 <CardHeader>
                   <CardTitle className="flex items-center justify-between text-lg">
                     <span className="flex items-center gap-3">
@@ -104,10 +114,12 @@ export default function ReportPage() {
                     </span>
                     <span className="flex items-center gap-2">
                       {q.negotiated && q.priceBefore != null && (
-                        <span className="text-sm text-muted-foreground line-through">${q.priceBefore.toLocaleString()}</span>
+                        <span className="font-mono text-sm text-muted-foreground line-through">${q.priceBefore.toLocaleString()}</span>
                       )}
                       {q.callOutcome === 'quoted' ? (
-                        <span className="text-xl font-bold">${q.totalPrice.toLocaleString()}</span>
+                        <span className={`font-mono text-xl font-bold ${q.quoteId === highestQuoteId ? 'text-red-brand' : ''}`}>
+                          ${q.totalPrice.toLocaleString()}
+                        </span>
                       ) : (
                         <span className="text-sm font-medium text-muted-foreground">no price given</span>
                       )}
@@ -117,21 +129,21 @@ export default function ReportPage() {
                 <CardContent className="space-y-3">
                   <div className="flex flex-wrap gap-2">
                     {q.binding ? <Badge variant="outline">binding</Badge> : <Badge variant="secondary">non-binding</Badge>}
-                    {q.negotiated && <Badge className="bg-indigo-600">price dropped on call</Badge>}
-                    {q.redFlag && <Badge variant="destructive">red flag</Badge>}
-                    {q.itemizationMismatch && <Badge variant="destructive">itemization doesn&apos;t add up</Badge>}
+                    {q.negotiated && <Badge>price dropped on call</Badge>}
+                    {q.redFlag && <Badge className="border-amber bg-amber/15 text-foreground">⚑ red flag</Badge>}
+                    {q.itemizationMismatch && <Badge className="border-amber bg-amber/15 text-foreground">⚑ doesn&apos;t add up</Badge>}
                     <Badge variant="secondary">{q.callOutcome}</Badge>
                   </div>
-                  {q.redFlag && q.redFlagReason && <p className="text-sm text-red-600">{q.redFlagReason}</p>}
+                  {q.redFlag && q.redFlagReason && <p className="text-sm text-foreground/80">⚑ {q.redFlagReason}</p>}
                   {q.callOutcome === 'quoted' ? (
                     <div className="rounded-md border p-3 text-sm">
                       <div className="flex justify-between font-medium">
-                        <span>Base price</span><span>${q.basePrice.toLocaleString()}</span>
+                        <span>Base price</span><span className="font-mono">${q.basePrice.toLocaleString()}</span>
                       </div>
                       {q.lineItems.map((li, j) => (
                         <div key={j} className="flex justify-between text-muted-foreground">
                           <span>{li.label}</span>
-                          <span>{li.amount == null ? 'undisclosed' : `$${li.amount.toLocaleString()}`}</span>
+                          <span className="font-mono">{li.amount == null ? 'undisclosed' : `$${li.amount.toLocaleString()}`}</span>
                         </div>
                       ))}
                     </div>
@@ -306,7 +318,7 @@ function TakeAction({ report, defaultEmail }: { report: Report; defaultEmail: st
         {error && <p className="text-sm text-red-500">{error}</p>}
         {result && (
           <div className="space-y-2 rounded-md border p-3 text-sm">
-            <p className="font-medium text-indigo-600">
+            <p className="font-medium text-signal-deep">
               Invoice requested from {result.providerName} → {result.email}
             </p>
             {result.turns.map((t, i) => (
