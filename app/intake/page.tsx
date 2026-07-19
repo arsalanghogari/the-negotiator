@@ -5,6 +5,7 @@ import { ConversationProvider, useConversation } from '@elevenlabs/react';
 import { useSpeechGate } from '@/lib/use-speech-gate';
 import { stripDirections } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -97,11 +98,46 @@ export default function IntakePage() {
   }
 
   return (
-    <main className="mx-auto max-w-3xl space-y-6 p-8">
-      <h1 className="text-3xl font-bold tracking-tight">Job intake</h1>
+    <main className="mx-auto max-w-6xl space-y-6 p-8">
+      <div className="space-y-1.5">
+        <h1 className="text-3xl font-bold tracking-tight">Job intake</h1>
+        <p className="max-w-2xl text-muted-foreground">
+          Parley calls moving companies, compares itemized quotes, and negotiates the price down
+          for you. Start with the voice interview — it builds the job spec Parley reads
+          identically to every mover it calls.
+        </p>
+      </div>
 
+      <div className="grid items-start gap-6 lg:grid-cols-2">
+        <VoiceIntake
+          demo={demo}
+          onSpec={(ex) => {
+            // The agent may return null for fields it didn't collect — nulls keep current
+            // values (same rule as document extraction), else inputs get value={null}.
+            setSpec((s) => ({
+              ...s,
+              ...prune(ex),
+              origin: { ...s.origin, ...prune(ex.origin) },
+              destination: { ...s.destination, ...prune(ex.destination) },
+              jobId: demo ? 'job-demo-1' : s.jobId,
+            }));
+            setMessage(
+              demo
+                ? 'Voice intake captured — verify the details, then click Confirm to start the calls.'
+                : 'Voice intake captured — review and confirm on the right.'
+            );
+          }}
+        />
+
+        <div className="space-y-6">
       <Card>
-        <CardHeader><CardTitle>Upload an existing quote or room photos</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle>Have a quote or photos already?</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Optional — upload an existing quote, bill, or room photos and Parley pulls the
+            details into the form too.
+          </p>
+        </CardHeader>
         <CardContent className="flex items-center gap-4">
           <Input
             type="file"
@@ -113,31 +149,17 @@ export default function IntakePage() {
         </CardContent>
       </Card>
 
-      <VoiceIntake
-        demo={demo}
-        onSpec={(ex) => {
-          // The agent may return null for fields it didn't collect — nulls keep current
-          // values (same rule as document extraction), else inputs get value={null}.
-          setSpec((s) => ({
-            ...s,
-            ...prune(ex),
-            origin: { ...s.origin, ...prune(ex.origin) },
-            destination: { ...s.destination, ...prune(ex.destination) },
-            jobId: demo ? 'job-demo-1' : s.jobId,
-          }));
-          setMessage(
-            demo
-              ? 'Voice intake captured — verify the details below, then click Confirm to start the calls.'
-              : 'Voice intake captured — review and confirm below.'
-          );
-        }}
-      />
-
       <Card>
-        <CardHeader><CardTitle>Confirm the job spec</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle>Your job spec</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Do the voice interview and this fills itself. Review, tweak anything, and confirm —
+            Parley uses it word-for-word on every call.
+          </p>
+        </CardHeader>
         <CardContent className="space-y-4">
           {(['origin', 'destination'] as const).map((k) => (
-            <fieldset key={k} className="grid grid-cols-4 items-end gap-3">
+            <fieldset key={k} className="grid grid-cols-2 items-end gap-3">
               <div className="space-y-1">
                 <Label className="capitalize">{k} city</Label>
                 <Input value={spec[k].city} onChange={(e) => set({ [k]: { ...spec[k], city: e.target.value } })} />
@@ -157,7 +179,7 @@ export default function IntakePage() {
             </fieldset>
           ))}
 
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label>Distance (mi)</Label>
               <Input type="number" value={spec.distanceMiles} onChange={(e) => set({ distanceMiles: +e.target.value })} />
@@ -228,6 +250,8 @@ export default function IntakePage() {
           </div>
         </CardContent>
       </Card>
+        </div>
+      </div>
     </main>
   );
 }
@@ -320,33 +344,56 @@ function VoiceIntakeInner({ demo, onSpec }: { demo: boolean; onSpec: (spec: Part
 
   const live = conversation.status === 'connected';
   return (
-    <Card className={demo ? 'border-signal-deep' : ''}>
+    <Card className={demo ? 'border-signal-deep lg:sticky lg:top-6' : 'lg:sticky lg:top-6'}>
       <CardHeader>
-        <CardTitle>{demo ? 'Voice interview — demo customer 🔊' : 'Voice interview'}</CardTitle>
+        <CardTitle className="flex items-center justify-between">
+          <span>{demo ? 'Voice interview — demo customer 🔊' : 'Voice interview'}</span>
+          {live && (
+            <Badge className="gap-1.5 bg-signal/20 font-mono text-xs text-foreground">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-signal-deep" />
+              {conversation.isSpeaking ? 'agent speaking…' : 'listening…'}
+            </Badge>
+          )}
+        </CardTitle>
+        <p className="text-sm text-muted-foreground">
+          Talk to Parley like you&apos;d talk to a mover — it asks what a professional estimator
+          would, then fills the form on the right for you.
+        </p>
       </CardHeader>
       <CardContent className="space-y-3">
-        <div className="flex items-center gap-3">
-          <Button onClick={live ? () => conversation.endSession() : start} variant={live ? 'destructive' : 'default'}>
-            {live ? 'End interview' : demo ? '▶ Start demo interview' : 'Start voice interview'}
-          </Button>
-          <span className="text-sm text-muted-foreground">
-            {live
-              ? conversation.isSpeaking ? 'Agent speaking…' : 'Listening…'
-              : demo
-                ? 'A synthetic customer answers the intake agent out loud; the form fills itself, then the calls start.'
-                : 'Answer a few questions, confirm, and the form fills itself.'}
-          </span>
-        </div>
-        {turns.length > 0 && (
-          <div ref={scrollRef} className="max-h-48 space-y-1 overflow-y-auto rounded-md border p-3 text-sm">
-            {turns.map((t, i) => (
-              <p key={i}>
-                <span className="font-medium">{t.source === 'user' ? 'You' : 'Agent'}:</span> {t.message}
-              </p>
-            ))}
+        {turns.length === 0 ? (
+          <div className="flex min-h-[340px] flex-col items-center justify-center gap-4 rounded-md border border-dashed p-8 text-center">
+            <span className="text-4xl">🎙️</span>
+            <Button size="lg" onClick={start} disabled={live}>
+              {demo ? '▶ Start demo interview' : 'Start voice interview'}
+            </Button>
+            <p className="max-w-xs text-sm text-muted-foreground">
+              {demo
+                ? 'A synthetic customer answers the interview out loud; the form fills itself, then the calls start.'
+                : 'About two minutes. Answer a few questions, confirm the summary, and the form fills itself.'}
+            </p>
           </div>
+        ) : (
+          <>
+            <div ref={scrollRef} className="max-h-[440px] min-h-[340px] space-y-2 overflow-y-auto rounded-md border p-3">
+              {turns.map((t, i) => (
+                <div key={i} className={`flex ${t.source === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div
+                    className={`max-w-[85%] rounded-2xl px-3.5 py-2 text-sm ${
+                      t.source === 'user' ? 'bg-ink text-white' : 'bg-secondary'
+                    }`}
+                  >
+                    {t.message}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <Button variant={live ? 'destructive' : 'outline'} onClick={live ? () => conversation.endSession() : start}>
+              {live ? 'End interview' : 'Restart interview'}
+            </Button>
+          </>
         )}
-        {error && <p className="text-sm text-red-500">{error}</p>}
+        {error && <p className="text-sm text-red-brand">{error}</p>}
       </CardContent>
     </Card>
   );
