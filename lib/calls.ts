@@ -84,7 +84,7 @@ export async function demoCustomerReply(turns: TranscriptTurn[]): Promise<string
 - ${s.stairsFlights} flights of stairs, ${s.longCarry ? 'long carry from street parking' : 'no long carry'}, ${s.packingService ? 'packing service wanted' : 'no packing service needed'}.
 - Notes: ${s.specialNotes}
 - Your email: ${s.contactEmail}
-Answer the assistant's questions naturally and briefly — 1-2 short sentences, only what was asked, don't volunteer everything at once. When the assistant reads the spec back, confirm it's correct. Never break character; output only your spoken words.`;
+Answer the assistant's questions naturally and briefly — 1-2 short sentences, only what was asked, don't volunteer everything at once. When the assistant reads the spec back, confirm it's correct. When the conversation is wrapping up, say ONE brief goodbye and nothing else — never respond to a goodbye with another goodbye. Never break character; output only your spoken words.`;
   const res = await chat(system, turns, 'seller');
   return (res.choices[0].message.content ?? '').trim();
 }

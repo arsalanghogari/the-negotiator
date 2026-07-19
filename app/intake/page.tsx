@@ -241,6 +241,7 @@ function VoiceIntakeInner({ demo, onSpec }: { demo: boolean; onSpec: (spec: Part
   const [turns, setTurns] = useState<{ source: string; message: string }[]>([]);
   const [error, setError] = useState('');
   const gate = useSpeechGate();
+  const doneRef = useRef(false); // spec saved — stop the reply loop or the goodbyes never end
   const scrollRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
@@ -257,7 +258,11 @@ function VoiceIntakeInner({ demo, onSpec }: { demo: boolean; onSpec: (spec: Part
       save_job_spec: (params: { job_spec_json: string }) => {
         try {
           onSpec(JSON.parse(params.job_spec_json));
-          if (demo) gate.clear(); // no more replies; parent takes over
+          if (demo) {
+            doneRef.current = true;
+            gate.clear();
+            setTimeout(() => conversation.endSession(), 8000); // let the goodbye play, then hang up
+          }
           return 'saved';
         } catch {
           return 'invalid JSON, please retry with valid JSON';
@@ -267,7 +272,7 @@ function VoiceIntakeInner({ demo, onSpec }: { demo: boolean; onSpec: (spec: Part
     onModeChange: gate.onModeChange,
     onMessage: async ({ source, message }: { source: string; message: string }) => {
       addTurn({ source, message });
-      if (!demo || source !== 'ai' || !message) return;
+      if (!demo || source !== 'ai' || !message || doneRef.current) return;
       gate.noteAgentMessage();
       try {
         // Turn mapping for the customer model: agent = 'negotiator', customer = 'seller'.
@@ -294,6 +299,7 @@ function VoiceIntakeInner({ demo, onSpec }: { demo: boolean; onSpec: (spec: Part
 
   async function start() {
     setError('');
+    doneRef.current = false;
     turnsLive.current = [];
     setTurns([]);
     try {
