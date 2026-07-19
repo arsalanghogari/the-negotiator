@@ -26,10 +26,25 @@ function ShowcaseCall() {
   const [quote, setQuote] = useState<Quote | null>(null);
   const [error, setError] = useState('');
   const turnsRef = useRef<TranscriptTurn[]>([]);
+  const speakingRef = useRef(false);
+  const pendingReplyRef = useRef<string | null>(null);
   const push = (t: TranscriptTurn) => {
     turnsRef.current = [...turnsRef.current, t];
     setTurns(turnsRef.current);
   };
+
+  // Sending a user message while the agent is speaking barges in and cuts it off
+  // mid-sentence — hold the seller's reply until the agent finishes, then send.
+  function flushReply() {
+    const text = pendingReplyRef.current;
+    if (!text || speakingRef.current) return;
+    pendingReplyRef.current = null;
+    setTimeout(() => {
+      if (turnsRef.current.length === 0) return; // call was ended/reset meanwhile
+      push({ speaker: 'seller', text });
+      conversation.sendUserMessage(text);
+    }, 700); // a natural beat between speakers
+  }
 
   const conversation = useConversation({
     micMuted: true, // no human on this call; the seller feeds in as text
@@ -37,9 +52,14 @@ function ShowcaseCall() {
       get_best_competing_quote: async () => JSON.stringify(await (await fetch('/api/best-quote')).json()),
       log_quote: (p: { quote_json: string }) => {
         void p; // the authoritative Quote comes from transcript extraction on save
-        setTimeout(finish, 4000); // let the goodbye line play out
+        pendingReplyRef.current = null; // no reply after the goodbye
+        setTimeout(finish, 6000); // let the goodbye line play out
         return 'logged';
       },
+    },
+    onModeChange: ({ mode }: { mode: string }) => {
+      speakingRef.current = mode === 'speaking';
+      if (mode !== 'speaking') flushReply();
     },
     onMessage: async ({ source, message }: { source: string; message: string }) => {
       if (source !== 'ai' || !message) return;
@@ -51,8 +71,8 @@ function ShowcaseCall() {
           body: JSON.stringify({ turns: turnsRef.current }),
         });
         const { text } = await res.json();
-        push({ speaker: 'seller', text });
-        conversation.sendUserMessage(text);
+        pendingReplyRef.current = text;
+        flushReply(); // sends now if the agent already finished speaking
       } catch (e) {
         setError(String(e));
       }
