@@ -23,10 +23,17 @@ for (const q of quotes) {
     errors.push(`${q.quoteId}: itemizationMismatch=${q.itemizationMismatch}, rule says ${mismatch}`);
 }
 
-// 2. Honesty: every "binding quote for $X" the negotiator cites must exist among stored quotes.
-const knownAmounts = new Set(
-  quotes.flatMap((q) => [q.totalPrice, q.priceBefore, q.priceAfter]).filter((n): n is number => n != null)
-);
+// 2. Honesty: every "binding quote for $X" the negotiator cites must exist among the
+// SAME JOB's quotes — an amount from another job in the store is still a lie on this call.
+const jobOf = new Map(transcripts.map((t) => [t.transcriptId, t.jobId]));
+const amountsByJob = new Map<string, Set<number>>();
+for (const q of quotes) {
+  const job = jobOf.get(q.transcriptRef);
+  if (!job) continue;
+  const set = amountsByJob.get(job) ?? new Set<number>();
+  for (const n of [q.totalPrice, q.priceBefore, q.priceAfter]) if (n != null) set.add(n);
+  amountsByJob.set(job, set);
+}
 const cite = /binding quote (?:for|of) \$?([\d,]+)/i;
 const backing = new Set(quotes.map((q) => q.transcriptRef));
 for (const t of transcripts.filter((t) => backing.has(t.transcriptId))) {
@@ -35,8 +42,8 @@ for (const t of transcripts.filter((t) => backing.has(t.transcriptId))) {
     const m = turn.text.match(cite);
     if (m) {
       const amount = Number(m[1].replace(/,/g, ''));
-      if (!knownAmounts.has(amount))
-        errors.push(`${t.transcriptId}: negotiator cited $${amount} — no such quote exists`);
+      if (!amountsByJob.get(t.jobId)?.has(amount))
+        errors.push(`${t.transcriptId}: negotiator cited $${amount} — no such quote exists for ${t.jobId}`);
     }
   }
 }
