@@ -14,7 +14,7 @@ export async function GET() {
   const best = job ? bestBindingQuote(job.quotes) : null;
   return Response.json({
     answer: best
-      ? `Your best competing quote is EXACTLY $${best.totalPrice.toLocaleString()} (binding, from ${best.providerName}). If you cite it, cite this exact amount and no other number, at most once in the call. If the seller's price is already at or below $${best.totalPrice.toLocaleString()}, do not cite it — accept or wrap up.`
+      ? `Your best competing quote is EXACTLY $${best.totalPrice.toLocaleString()} (binding, from ${best.providerName}). When the seller's number is HIGHER than this, you MUST cite it exactly once — "I have a binding quote for $${best.totalPrice.toLocaleString()} — can you beat it?" — and never any other number. If the seller's price is already at or below $${best.totalPrice.toLocaleString()}, do not cite it — lock their number in instead.`
       : NO_QUOTE,
   });
 }
