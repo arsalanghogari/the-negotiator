@@ -39,17 +39,6 @@ export default function IntakePage() {
     setDemo(new URLSearchParams(window.location.search).get('demo') === '1');
   }, []);
 
-  // Demo flow: the voice intake produced a confirmed spec — save it and roll into the calls.
-  async function demoConfirm(merged: JobSpec) {
-    const final = { ...merged, jobId: 'job-demo-1', confirmedByUser: true };
-    await fetch('/api/jobspec', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(final),
-    });
-    setMessage('Spec confirmed — starting the negotiation calls…');
-    setTimeout(() => { window.location.href = '/calls?demo=1'; }, 4000); // let the agent say goodbye
-  }
 
   const set = (patch: Partial<JobSpec>) => setSpec((s) => ({ ...s, ...patch }));
 
@@ -97,7 +86,12 @@ export default function IntakePage() {
       body: JSON.stringify(final),
     });
     setSpec(final);
-    setMessage(res.ok ? `Saved ${final.jobId}. Ready for calls.` : 'Save failed.');
+    if (res.ok && demo) {
+      setMessage('Spec confirmed — starting the negotiation calls…');
+      setTimeout(() => { window.location.href = '/calls?demo=1'; }, 1200);
+    } else {
+      setMessage(res.ok ? `Saved ${final.jobId}. Ready for calls.` : 'Save failed.');
+    }
     setBusy(null);
   }
 
@@ -121,12 +115,18 @@ export default function IntakePage() {
       <VoiceIntake
         demo={demo}
         onSpec={(ex) => {
-          setSpec((s) => {
-            const merged = { ...s, ...ex, origin: { ...s.origin, ...ex.origin }, destination: { ...s.destination, ...ex.destination } };
-            if (demo) demoConfirm(merged);
-            return merged;
-          });
-          if (!demo) setMessage('Voice intake captured — review and confirm below.');
+          setSpec((s) => ({
+            ...s,
+            ...ex,
+            origin: { ...s.origin, ...ex.origin },
+            destination: { ...s.destination, ...ex.destination },
+            jobId: demo ? 'job-demo-1' : s.jobId,
+          }));
+          setMessage(
+            demo
+              ? 'Voice intake captured — verify the details below, then click Confirm to start the calls.'
+              : 'Voice intake captured — review and confirm below.'
+          );
         }}
       />
 
