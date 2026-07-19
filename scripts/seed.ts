@@ -63,4 +63,4 @@ const txs = await readAll<Transcript>('transcripts');
 if (specs[0]?.jobId !== 'job-demo-1' || txs.length !== 3) {
   throw new Error('seed round-trip failed');
 }
-console.log(`Seeded 1 JobSpec + ${txs.length} transcripts into .data/`);
+console.log(`Seeded 1 JobSpec + ${txs.length} transcripts via ${process.env.SUPABASE_URL ? 'Supabase' : 'local .data/'}`);

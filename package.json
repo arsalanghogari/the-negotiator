@@ -7,8 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "seed": "node scripts/seed.ts",
-    "check": "node scripts/check.ts"
+    "seed": "node --env-file-if-exists=.env scripts/seed.ts",
+    "check": "node --env-file-if-exists=.env scripts/check.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
