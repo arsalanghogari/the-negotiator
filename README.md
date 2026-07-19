@@ -1,36 +1,52 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# The Negotiator
 
-## Getting Started
+A voice-AI agent that shops and negotiates moving quotes by phone. Built solo for HackNation #6 (ElevenLabs Challenge).
 
-First, run the development server:
+The same 2BR move costs anywhere from **$1,158 to $6,506**. The Negotiator runs a voice intake to build one structured job spec, calls three movers with distinct negotiation styles, extracts itemized comparable quotes, uses competing bids as leverage so a price actually drops **during a call**, and delivers a ranked, evidence-backed recommendation with transcripts — then calls the winner back to book and request the invoice.
+
+## Quickstart
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+cp .env.example .env   # fill in the keys below
+npm run seed           # demo job spec + fixture transcripts
+npm run dev            # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Click **▶ Run demo** on the landing page: intake → 3 live negotiation calls (watch the transcripts stream) → ranked report, one click.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+**Env vars** (`.env`): `OPENAI_API_KEY`, `ELEVENLABS_API_KEY`, `ELEVENLABS_AGENT_ID_INTAKE`, `ELEVENLABS_AGENT_ID_NEGOTIATOR`, optional `SUPABASE_URL`/`SUPABASE_ANON_KEY`, `DEMO_MODE=true`. Verify keys at `/api/ping`.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## How it works
 
-## Learn More
+```
+Intake (ElevenLabs voice interview OR document upload → gpt-4o vision)
+   → JobSpec (confirmed by user, reused verbatim on every call)
+   → Calls: negotiator ↔ 3 simulated seller personas (tough / lowballer / upseller)
+       · sequential, so earlier binding quotes arm later calls with leverage
+       · showcase call runs over real ElevenLabs voice with mid-call tools
+         (get_best_competing_quote, log_quote) and the "are you a robot?" disclosure
+   → Quotes: every transcript → structured, itemized Quote (strict JSON schema)
+   → Report: ranked cards, negotiated deltas, red-flag badges, cited rationale
+   → Take action: calls the winner back, books under the customer's name,
+     requests the itemized invoice by email
+```
 
-To learn more about Next.js, take a look at the following resources:
+- **Screens:** `/` landing · `/intake` · `/calls` (incl. the voice showcase call) · `/report`
+- **Honesty guardrails:** the agent discloses it's an AI when asked, never invents a competing bid (citation discipline: only the exact tool-returned amount, at most once), and every call ends in a structured outcome. `npm run check` verifies the stored data against the deterministic rules.
+- **Deterministic over model judgment:** red-flag rule (≥30% below the $2,400 market median), negotiated-total override, and ranking are code; the model handles conversation and extraction only.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Design notes
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- **Vertical is config, not code.** Everything moving-specific — job-spec fields aside, all benchmarks, red-flag rules, personas, provider names, and prompts — lives in [`config/vertical.ts`](config/vertical.ts). Switching to auto body shops means swapping that file (plus the `JobSpec` type), not rewriting agents.
+- **Counterparty seam.** Sellers are OpenAI-driven personas today (`DEMO_MODE=true`, fully reproducible with zero phone/human input). The negotiator logic doesn't know or care — a human-mic or Twilio counterparty can slot in behind the same interface.
+- **Persistence seam.** Local JSON store (`.data/`) behind `lib/store.ts`; Supabase swaps in via env vars without touching callers.
+- Sequential calls are deliberate (leverage chain); parallelism would go in `/api/calls/run`.
 
-## Deploy on Vercel
+## Scripts
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| command | what |
+|---|---|
+| `npm run dev` / `build` / `start` | Next.js |
+| `npm run seed` | demo JobSpec + 3 fixture transcripts |
+| `npm run check` | guardrail audit of stored quotes/transcripts |

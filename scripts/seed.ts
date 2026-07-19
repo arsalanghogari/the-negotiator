@@ -1,26 +1,8 @@
 // Seeds a demo JobSpec + 3 persona transcripts so M3+ can be built without live voice.
 // Run: npm run seed
 import { readAll, writeAll } from '../lib/store.ts';
+import { demoJobSpec as jobSpec } from '../lib/demo.ts';
 import type { JobSpec, Transcript } from '../types.ts';
-
-const jobSpec: JobSpec = {
-  jobId: 'job-demo-1',
-  vertical: 'moving',
-  origin: { city: 'San Francisco', zip: '94110', floor: 3, hasElevator: false },
-  destination: { city: 'San Jose', zip: '95112', floor: 1, hasElevator: true },
-  distanceMiles: 45,
-  homeSize: '2br',
-  largeItems: ['upright piano', 'sofa', 'fridge'],
-  boxCountEst: 40,
-  stairsFlights: 2,
-  longCarry: true,
-  packingService: false,
-  preferredDate: '2026-08-01',
-  specialNotes: 'Piano needs padding; street parking only at origin.',
-  customerName: 'Alex Rivera',
-  contactEmail: 'demo@thenegotiator.app',
-  confirmedByUser: true,
-};
 
 const transcripts: Transcript[] = [
   {

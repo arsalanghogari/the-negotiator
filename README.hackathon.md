@@ -1,1 +1,0 @@
-Hack-Nation Hackathon App

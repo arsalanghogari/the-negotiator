@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ConversationProvider, useConversation } from '@elevenlabs/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -206,9 +206,31 @@ export default function CallsPage() {
   });
   const [running, setRunning] = useState(false);
   const [error, setError] = useState('');
+  const [demoStep, setDemoStep] = useState('');
   const scrollRefs = useRef<Partial<Record<Persona, HTMLDivElement | null>>>({});
 
-  async function run() {
+  // Run-demo flow: /calls?demo=1 auto-runs the calls, then generates the report and moves on.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('demo') === '1') {
+      runDemo();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function runDemo() {
+    setDemoStep('Calling 3 movers…');
+    const ok = await run();
+    if (!ok) return setDemoStep('');
+    setDemoStep('Calls done — generating the ranked report…');
+    const res = await fetch('/api/report', { method: 'POST' });
+    if (!res.ok) {
+      setError(await res.text());
+      return setDemoStep('');
+    }
+    window.location.href = '/report';
+  }
+
+  async function run(): Promise<boolean> {
     setRunning(true);
     setError('');
     setCalls({ lowballer: idle(), upseller: idle(), tough: idle() });
@@ -242,8 +264,10 @@ export default function CallsPage() {
           if (el) requestAnimationFrame(() => el.scrollTo({ top: el.scrollHeight }));
         }
       }
+      return true;
     } catch (e) {
       setError(String(e));
+      return false;
     } finally {
       setRunning(false);
     }
@@ -253,7 +277,10 @@ export default function CallsPage() {
     <main className="mx-auto max-w-6xl space-y-6 p-8">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Calls</h1>
-        <Button onClick={run} disabled={running}>{running ? 'Calling…' : 'Run 3 calls'}</Button>
+        <span className="flex items-center gap-3">
+          {demoStep && <span className="text-sm font-medium text-indigo-600">{demoStep}</span>}
+          <Button onClick={run} disabled={running}>{running ? 'Calling…' : 'Run 3 calls'}</Button>
+        </span>
       </div>
       {error && <p className="text-sm text-red-500">{error}</p>}
 
