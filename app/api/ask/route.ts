@@ -13,9 +13,14 @@ export async function POST(req: Request) {
 
   const spec = (await readAll<JobSpec>('jobspecs')).filter((s) => s.confirmedByUser).at(-1);
   if (!spec) return Response.json({ error: 'no confirmed job spec yet' }, { status: 400 });
-  const transcripts = (await readAll<Transcript>('transcripts')).filter((t) => t.jobId === spec.jobId);
-  const refs = new Set(transcripts.map((t) => t.transcriptId));
+  // Only transcripts backing an extracted quote — seeded fixtures share the demo jobId with
+  // live runs, and feeding both gives the model two conflicting versions of every call
+  // (the exact hallucination this guards against; same rule as report generation).
+  const all = (await readAll<Transcript>('transcripts')).filter((t) => t.jobId === spec.jobId);
+  const refs = new Set(all.map((t) => t.transcriptId));
   const quotes = (await readAll<Quote>('quotes')).filter((q) => refs.has(q.transcriptRef));
+  const quoted = new Set(quotes.map((q) => q.transcriptRef));
+  const transcripts = all.filter((t) => quoted.has(t.transcriptId));
   const report = (await readAll<Report>('reports')).find((r) => r.jobId === spec.jobId);
 
   const openai = new OpenAI();
