@@ -46,9 +46,8 @@ export default function Home() {
           Start intake
         </a>
       </div>
-      <p className="text-sm text-white/50">
-        Run demo plays the whole loop: voice intake with a synthetic customer → negotiation
-        calls with one you can listen in on → ranked report.
+      <p className="font-mono text-sm text-white/50">
+        voice intake → negotiation calls → ranked report, one click
       </p>
     </main>
   );

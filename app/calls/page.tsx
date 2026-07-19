@@ -259,8 +259,7 @@ function ShowcaseCall({
           )}
           {violations.map((v, i) => (
             <p key={i} className="rounded-md border border-amber/50 bg-amber/10 p-2 text-sm text-white/90">
-              ⚑ Parley cited a ${v.toLocaleString()} competing quote that doesn&apos;t exist — the seller
-              was told to demand it in writing, and the agent was corrected live.
+              ⚑ Cited a nonexistent ${v.toLocaleString()} quote — corrected live.
             </p>
           ))}
           {quote && (
@@ -394,12 +393,6 @@ export default function CallsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
-          <p className="text-xs text-muted-foreground">
-            Real listings: &ldquo;{vertical.discovery.query}&rdquo;, {vertical.discovery.source} (fetched{' '}
-            {vertical.discovery.fetched}). Live mode dials these numbers via Twilio/SIP; demo mode
-            role-plays the {SELLERS.length} on the call sheet with fictional stand-ins so no real
-            business is misrepresented.
-          </p>
           <div className="grid grid-cols-2 gap-x-8 gap-y-1 text-sm">
             {vertical.discovery.candidates.map((c, i) => {
               const onSheet = i < SELLERS.length;
@@ -457,9 +450,7 @@ export default function CallsPage() {
                 >
                   {c.turns.length === 0 && (
                     <p className="text-muted-foreground">
-                      {persona === 'tough'
-                        ? 'This one runs as the live listen-in call above — start it to watch the transcript here.'
-                        : 'No call yet.'}
+                      {persona === 'tough' ? 'Runs live via Listen in above.' : 'No call yet.'}
                     </p>
                   )}
                   {c.turns.map((t, i) => (
@@ -505,10 +496,7 @@ export default function CallsPage() {
       </div>
 
       {Object.values(calls).some((c) => c.quote) && !demoStep && (
-        <div className="flex items-center justify-end gap-3">
-          <span className="text-sm text-muted-foreground">
-            Done calling? Rank the quotes and get the recommendation.
-          </span>
+        <div className="flex justify-end">
           <Button onClick={goReport} disabled={generating || running}>
             {generating ? 'Generating report…' : 'Generate the ranked report →'}
           </Button>

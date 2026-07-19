@@ -78,11 +78,10 @@ export default function ReportPage() {
                 </Badge>
               )}
             </div>
-            <p className="mt-3 text-xs text-white/60">
-              Market benchmark: ${vertical.marketMedian.toLocaleString()} median, observed range $
-              {vertical.marketRange.low.toLocaleString()}–${vertical.marketRange.high.toLocaleString()} (
-              {vertical.marketSource}). Red-flag rule: any quote ≥
-              {vertical.redFlagBelowMedianPct * 100}% below median is treated as a lowball warning, not a win.
+            <p className="mt-3 font-mono text-xs text-white/60">
+              benchmark ${vertical.marketMedian.toLocaleString()} median · range $
+              {vertical.marketRange.low.toLocaleString()}–${vertical.marketRange.high.toLocaleString()} · ⚑
+              at {vertical.redFlagBelowMedianPct * 100}% below median
             </p>
           </div>
 
@@ -149,9 +148,8 @@ export default function ReportPage() {
                     </div>
                   ) : (
                     <p className="text-sm text-muted-foreground">
-                      Wouldn&apos;t price it over the phone — logged as a{' '}
-                      {q.callOutcome === 'callback' ? 'callback commitment' : 'documented decline'}, not a
-                      vague range.
+                      Wouldn&apos;t price by phone — logged as a{' '}
+                      {q.callOutcome === 'callback' ? 'callback commitment' : 'documented decline'}.
                     </p>
                   )}
                   {txOf(q)?.conversationId && (
@@ -231,8 +229,7 @@ function AskAnything() {
       <CardContent className="space-y-3">
         {messages.length === 0 && (
           <p className="text-sm text-muted-foreground">
-            Ask anything grounded in your calls — e.g. &ldquo;why is the cheapest quote risky?&rdquo; or
-            &ldquo;what did Golden Gate say about insurance?&rdquo;
+            Grounded in your calls — e.g. &ldquo;why is the cheapest quote risky?&rdquo;
           </p>
         )}
         {messages.length > 0 && (
@@ -345,8 +342,7 @@ function TakeAction({ report, defaultEmail }: { report: Report; defaultEmail: st
           )}
         </CardTitle>
         <p className="text-sm text-muted-foreground">
-          Parley calls the seller back to book and request the itemized invoice by email. It
-          works on its own — join in and listen whenever you like.
+          Parley calls the winner back to book and request the invoice — listen in if you like.
           {/* ponytail: DEMO_MODE — the seller is simulated, so no real email is sent. */}
         </p>
       </CardHeader>

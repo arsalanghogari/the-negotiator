@@ -102,9 +102,8 @@ export default function IntakePage() {
       <div className="space-y-1.5">
         <h1 className="text-3xl font-bold tracking-tight">Job intake</h1>
         <p className="max-w-2xl text-muted-foreground">
-          Parley calls moving companies, compares itemized quotes, and negotiates the price down
-          for you. Start with the voice interview — it builds the job spec Parley reads
-          identically to every mover it calls.
+          Start with the voice interview — it builds the job spec Parley reads to every mover it
+          calls.
         </p>
       </div>
 
@@ -134,8 +133,7 @@ export default function IntakePage() {
         <CardHeader>
           <CardTitle>Have a quote or photos already?</CardTitle>
           <p className="text-sm text-muted-foreground">
-            Optional — upload an existing quote, bill, or room photos and Parley pulls the
-            details into the form too.
+            Optional — Parley pulls the details from an existing quote, bill, or photos.
           </p>
         </CardHeader>
         <CardContent className="flex items-center gap-4">
@@ -153,8 +151,7 @@ export default function IntakePage() {
         <CardHeader>
           <CardTitle>Your job spec</CardTitle>
           <p className="text-sm text-muted-foreground">
-            Do the voice interview and this fills itself. Review, tweak anything, and confirm —
-            Parley uses it word-for-word on every call.
+            Fills itself from the voice interview — review, tweak, confirm.
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -355,10 +352,6 @@ function VoiceIntakeInner({ demo, onSpec }: { demo: boolean; onSpec: (spec: Part
             </Badge>
           )}
         </CardTitle>
-        <p className="text-sm text-muted-foreground">
-          Talk to Parley like you&apos;d talk to a mover — it asks what a professional estimator
-          would, then fills the form on the right for you.
-        </p>
       </CardHeader>
       <CardContent className="space-y-3">
         {turns.length === 0 ? (
@@ -369,8 +362,8 @@ function VoiceIntakeInner({ demo, onSpec }: { demo: boolean; onSpec: (spec: Part
             </Button>
             <p className="max-w-xs text-sm text-muted-foreground">
               {demo
-                ? 'A synthetic customer answers the interview out loud; the form fills itself, then the calls start.'
-                : 'About two minutes. Answer a few questions, confirm the summary, and the form fills itself.'}
+                ? 'A synthetic customer answers out loud, then the calls start.'
+                : 'About two minutes — answer a few questions and the form fills itself.'}
             </p>
           </div>
         ) : (
