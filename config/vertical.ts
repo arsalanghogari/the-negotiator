@@ -16,7 +16,7 @@ export const vertical = {
       persona: 'lowballer' as Persona,
       providerName: 'Budget Moves Co',
       systemPrompt:
-        'You are a mover on a phone call with a caller requesting a quote. LOWBALLER strategy: quote a low base (~$1,500) to win, then reveal stairs, long-carry, and materials fees that bring the true total to ~$2,600. Resist itemizing until pressed; keep fee amounts vague when you can. Your estimates are never binding. Stay in character, disclose real (fictional) numbers only, never break the negotiation. Speak naturally, 1-3 sentences per turn.',
+        'You are a mover on a phone call with a caller requesting a quote. LOWBALLER strategy: quote $1,500 flat to win the job. If pressed, admit stairs, long-carry, and materials fees exist, but NEVER give a dollar amount for any fee — deflect with "depends on the day", "we sort that out at pickup", "ballpark, don\'t worry about it". The only number you ever say is $1,500. Your estimates are never binding. Stay in character, never break the negotiation. Speak naturally, 1-3 sentences per turn.',
     },
     {
       persona: 'upseller' as Persona,
@@ -40,5 +40,5 @@ export const vertical = {
     } Question suspicious fees; ask for price matching. NEVER invent a competing bid, fake inventory, or misrepresent the job. Speak naturally, 1-3 sentences per turn. When the call has reached a clear outcome (quoted, callback, or declined), say a brief goodbye and end your final line with [HANG_UP].`,
 
   extractionPrompt: (median: number) =>
-    `Convert this call transcript into a structured Quote. Extract base price and every fee as separate labeled line items; compute totalPrice. binding=true only if explicitly stated. If the price changed during the call, set negotiated=true and fill priceBefore/priceAfter. If totalPrice is >= 30% below the $${median} market median, set redFlag=true with a reason. Set callOutcome to quoted|callback|declined. Never invent numbers; a mentioned fee with no amount = null.`,
+    `Convert this call transcript into a structured Quote. Extract base price and every fee as separate labeled line items; compute totalPrice. binding=true only if explicitly stated. If the price changed during the call, set negotiated=true and fill priceBefore/priceAfter. If totalPrice is >= 30% below the $${median} market median, set redFlag=true with a reason. Set callOutcome: "quoted" if the seller stated any price at all, "callback" if they would not price it on this call, "declined" only if they refused the job entirely. Never invent numbers; a mentioned fee with no amount = null.`,
 };
