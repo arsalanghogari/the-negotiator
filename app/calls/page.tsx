@@ -27,10 +27,13 @@ function ShowcaseCall() {
   const [error, setError] = useState('');
   const turnsRef = useRef<TranscriptTurn[]>([]);
   // The gate: closed from the moment a negotiator message arrives until its audio has
-  // BOTH started and finished. Checking "speaking right now" isn't enough — the seller
-  // reply can arrive before TTS starts and barge in.
+  // started AND finished. "Finished" can't be the first silence — the SDK's mode signal
+  // is a voice-activity detector that flickers during pauses inside a sentence — so the
+  // gate opens only after SILENCE_MS of continuous silence.
+  const SILENCE_MS = 1500;
   const speakingRef = useRef(false);
   const awaitingSpeechRef = useRef(false);
+  const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingReplyRef = useRef<string | null>(null);
   const push = (t: TranscriptTurn) => {
     turnsRef.current = [...turnsRef.current, t];
@@ -45,11 +48,9 @@ function ShowcaseCall() {
     const text = pendingReplyRef.current;
     if (!text || !gateOpen()) return;
     pendingReplyRef.current = null;
-    setTimeout(() => {
-      if (turnsRef.current.length === 0) return; // call was ended/reset meanwhile
-      push({ speaker: 'seller', text });
-      conversation.sendUserMessage(text);
-    }, 700); // a natural beat between speakers
+    if (turnsRef.current.length === 0) return; // call was ended/reset meanwhile
+    push({ speaker: 'seller', text });
+    conversation.sendUserMessage(text); // the silence window already provides the natural beat
   }
 
   const conversation = useConversation({
@@ -67,9 +68,16 @@ function ShowcaseCall() {
       if (mode === 'speaking') {
         speakingRef.current = true;
         awaitingSpeechRef.current = false; // speech started — half the cycle done
-      } else {
-        speakingRef.current = false;
-        flushReply(); // speech ended — gate opens (unless still awaiting a fresh turn's audio)
+        if (silenceTimerRef.current) {
+          clearTimeout(silenceTimerRef.current); // a flicker, not the end of the turn
+          silenceTimerRef.current = null;
+        }
+      } else if (speakingRef.current && !silenceTimerRef.current) {
+        silenceTimerRef.current = setTimeout(() => {
+          silenceTimerRef.current = null;
+          speakingRef.current = false; // sustained silence — the turn is really over
+          flushReply();
+        }, SILENCE_MS);
       }
     },
     onMessage: async ({ source, message }: { source: string; message: string }) => {
