@@ -88,11 +88,11 @@ export default function IntakePage() {
       body: JSON.stringify(final),
     });
     setSpec(final);
-    if (res.ok && demo) {
+    if (res.ok) {
       setMessage('Spec confirmed — starting the negotiation calls…');
-      setTimeout(() => { window.location.href = '/calls?demo=1'; }, 1200);
+      setTimeout(() => { window.location.href = demo ? '/calls?demo=1' : '/calls'; }, 1200);
     } else {
-      setMessage(res.ok ? `Saved ${final.jobId}. Ready for calls.` : 'Save failed.');
+      setMessage('Save failed.');
     }
     setBusy(null);
   }
