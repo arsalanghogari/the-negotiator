@@ -34,11 +34,13 @@ export default function ReportPage() {
   const report = data?.report;
   const recommended = report?.ranked.find((q) => q.quoteId === report.recommendedQuoteId);
   const txOf = (q: Quote) => data?.transcripts.find((t) => t.transcriptId === q.transcriptRef);
-  // Brand role: highest quoted price renders in Overpay Red — but never the recommended
-  // pick, whose role (Signal) wins.
-  const highestQuoteId = report?.ranked
-    .filter((q) => q.callOutcome === 'quoted' && q.quoteId !== report.recommendedQuoteId)
+  // Brand role: the highest quoted price renders in Overpay Red. If that happens to be
+  // the recommended pick, its Signal role wins and nothing is red — the red never
+  // shifts onto a cheaper quote.
+  const highest = report?.ranked
+    .filter((q) => q.callOutcome === 'quoted')
     .sort((a, b) => b.totalPrice - a.totalPrice)[0]?.quoteId;
+  const highestQuoteId = highest === report?.recommendedQuoteId ? undefined : highest;
 
   return (
     <main className="mx-auto max-w-6xl space-y-6 p-8">
