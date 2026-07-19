@@ -31,7 +31,8 @@ const knownAmounts = new Set(
   quotes.flatMap((q) => [q.totalPrice, q.priceBefore, q.priceAfter]).filter((n): n is number => n != null)
 );
 const cite = /binding quote (?:for|of) \$?([\d,]+)/i;
-for (const t of transcripts) {
+const backing = new Set(quotes.map((q) => q.transcriptRef));
+for (const t of transcripts.filter((t) => backing.has(t.transcriptId))) {
   for (const turn of t.turns) {
     if (turn.speaker !== 'negotiator') continue;
     const m = turn.text.match(cite);
