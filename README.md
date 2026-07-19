@@ -27,7 +27,8 @@ Intake (ElevenLabs voice interview OR document upload → gpt-4o vision)
    → Calls: negotiator ↔ 4 simulated seller personas
      (lowballer / stonewaller / upseller / tough)
        · sequential, so earlier binding quotes arm later calls with leverage
-       · showcase call runs over real ElevenLabs voice with mid-call tools
+       · listen-in call is fully audible — negotiator over live ElevenLabs voice,
+         seller replies spoken via TTS in sequence — with mid-call tools
          (get_best_competing_quote, log_quote) and the "are you a robot?" disclosure
    → Quotes: every transcript → structured, itemized Quote (strict JSON schema)
    → Report: ranked cards, negotiated deltas, red-flag badges, cited rationale,

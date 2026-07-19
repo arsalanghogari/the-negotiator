@@ -28,13 +28,42 @@ function ShowcaseCall() {
   const [phase, setPhase] = useState<'idle' | 'live' | 'saving' | 'done'>('idle');
   const [quote, setQuote] = useState<Quote | null>(null);
   const [error, setError] = useState('');
+  const [sellerSpeaking, setSellerSpeaking] = useState(false);
   const turnsRef = useRef<TranscriptTurn[]>([]);
   const convIdRef = useRef(''); // ElevenLabs conversation id — lets the report link the recording
+  const sellerAudioRef = useRef<HTMLAudioElement | null>(null);
   const gate = useSpeechGate();
   const push = (t: TranscriptTurn) => {
     turnsRef.current = [...turnsRef.current, t];
     setTurns(turnsRef.current);
   };
+
+  // Listen-in: the seller's reply is spoken aloud (TTS) BEFORE the text goes to the agent,
+  // so the user hears the whole sequence and the two voices never overlap.
+  async function speakSeller(text: string, then: () => void) {
+    const done = (audio?: HTMLAudioElement) => {
+      if (audio) URL.revokeObjectURL(audio.src);
+      sellerAudioRef.current = null;
+      setSellerSpeaking(false);
+      then();
+    };
+    try {
+      const res = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ text }),
+      });
+      if (!res.ok) throw new Error(`tts ${res.status}`);
+      const audio = new Audio(URL.createObjectURL(await res.blob()));
+      sellerAudioRef.current = audio;
+      audio.onended = () => done(audio);
+      audio.onerror = () => done(audio);
+      setSellerSpeaking(true);
+      await audio.play();
+    } catch {
+      done(); // ponytail: TTS is garnish — degrade to text-only rather than stall the call
+    }
+  }
 
   const conversation = useConversation({
     micMuted: true, // no human on this call; the seller feeds in as text
@@ -62,7 +91,7 @@ function ShowcaseCall() {
         gate.queue(() => {
           if (turnsRef.current.length === 0) return; // call was ended/reset meanwhile
           push({ speaker: 'seller', text });
-          conversation.sendUserMessage(text);
+          void speakSeller(text, () => conversation.sendUserMessage(text));
         });
       } catch (e) {
         setError(String(e));
@@ -98,6 +127,7 @@ function ShowcaseCall() {
     if (turnsRef.current.length < 2) return;
     setPhase('saving');
     try {
+      sellerAudioRef.current?.pause();
       conversation.endSession();
       const res = await fetch('/api/showcase-complete', {
         method: 'POST',
@@ -118,10 +148,16 @@ function ShowcaseCall() {
     <Card className="border-indigo-600">
       <CardHeader>
         <CardTitle className="flex items-center justify-between text-base">
-          <span>Showcase call — Bay Area Van Lines, live ElevenLabs voice 🔊</span>
+          <span>Listen in — Bay Area Van Lines, both sides live 🔊</span>
           <span className="flex items-center gap-2">
             {phase === 'live' && (
-              <Badge variant="secondary">{conversation.isSpeaking ? 'negotiator speaking…' : 'on call'}</Badge>
+              <Badge variant="secondary">
+                {conversation.isSpeaking
+                  ? 'negotiator speaking…'
+                  : sellerSpeaking
+                    ? 'seller speaking…'
+                    : 'on call'}
+              </Badge>
             )}
             <Button
               size="sm"
@@ -129,7 +165,7 @@ function ShowcaseCall() {
               onClick={phase === 'live' ? finish : start}
               disabled={phase === 'saving'}
             >
-              {phase === 'live' ? 'End & save' : phase === 'saving' ? 'Saving…' : 'Start voice call'}
+              {phase === 'live' ? 'End & save' : phase === 'saving' ? 'Saving…' : 'Listen in live'}
             </Button>
           </span>
         </CardTitle>
