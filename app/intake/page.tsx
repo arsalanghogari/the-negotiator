@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { ConversationProvider, useConversation } from '@elevenlabs/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -97,13 +98,12 @@ export default function IntakePage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader><CardTitle>Voice interview</CardTitle></CardHeader>
-        <CardContent className="text-sm text-muted-foreground">
-          {/* Wired once ELEVENLABS_AGENT_ID_INTAKE is set (M2, voice half). */}
-          Coming next — requires the ElevenLabs intake agent ID.
-        </CardContent>
-      </Card>
+      <VoiceIntake
+        onSpec={(ex) => {
+          setSpec((s) => ({ ...s, ...ex, origin: { ...s.origin, ...ex.origin }, destination: { ...s.destination, ...ex.destination } }));
+          setMessage('Voice intake captured — review and confirm below.');
+        }}
+      />
 
       <Card>
         <CardHeader><CardTitle>Confirm the job spec</CardTitle></CardHeader>
@@ -191,6 +191,76 @@ export default function IntakePage() {
         </CardContent>
       </Card>
     </main>
+  );
+}
+
+function VoiceIntake(props: { onSpec: (spec: Partial<JobSpec>) => void }) {
+  return (
+    <ConversationProvider>
+      <VoiceIntakeInner {...props} />
+    </ConversationProvider>
+  );
+}
+
+function VoiceIntakeInner({ onSpec }: { onSpec: (spec: Partial<JobSpec>) => void }) {
+  const [turns, setTurns] = useState<{ source: string; message: string }[]>([]);
+  const [error, setError] = useState('');
+  const conversation = useConversation({
+    clientTools: {
+      // The intake agent calls this after the user confirms the spec verbally.
+      save_job_spec: (params: { job_spec_json: string }) => {
+        try {
+          onSpec(JSON.parse(params.job_spec_json));
+          return 'saved';
+        } catch {
+          return 'invalid JSON, please retry with valid JSON';
+        }
+      },
+    },
+    onMessage: ({ source, message }: { source: string; message: string }) =>
+      setTurns((t) => [...t, { source, message }]),
+    onError: (e: unknown) => setError(String(e)),
+  });
+
+  async function start() {
+    setError('');
+    setTurns([]);
+    try {
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+      const res = await fetch('/api/voice-token?agent=intake');
+      const { token, error } = await res.json();
+      if (!res.ok) throw new Error(error);
+      await conversation.startSession({ conversationToken: token });
+    } catch (e) {
+      setError(String(e));
+    }
+  }
+
+  const live = conversation.status === 'connected';
+  return (
+    <Card>
+      <CardHeader><CardTitle>Voice interview</CardTitle></CardHeader>
+      <CardContent className="space-y-3">
+        <div className="flex items-center gap-3">
+          <Button onClick={live ? () => conversation.endSession() : start} variant={live ? 'destructive' : 'default'}>
+            {live ? 'End interview' : 'Start voice interview'}
+          </Button>
+          <span className="text-sm text-muted-foreground">
+            {live ? (conversation.isSpeaking ? 'Agent speaking…' : 'Listening…') : 'Answer a few questions, confirm, and the form fills itself.'}
+          </span>
+        </div>
+        {turns.length > 0 && (
+          <div className="max-h-48 space-y-1 overflow-y-auto rounded-md border p-3 text-sm">
+            {turns.map((t, i) => (
+              <p key={i}>
+                <span className="font-medium">{t.source === 'user' ? 'You' : 'Agent'}:</span> {t.message}
+              </p>
+            ))}
+          </div>
+        )}
+        {error && <p className="text-sm text-red-500">{error}</p>}
+      </CardContent>
+    </Card>
   );
 }
 
