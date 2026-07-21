@@ -24,6 +24,10 @@ export const moving = {
   // The whole job spec is relevant to a moving call.
   specForCall: (spec: JobSpec): object => spec,
 
+  // Live discovery searches where the job actually is (movers load at the origin).
+  discoveryQuery: (spec: JobSpec) =>
+    `moving companies near ${spec.origin.city}${spec.origin.zip ? `, ${spec.origin.zip}` : ''}`,
+
   // Deterministic first line: identical job intro on every call, no first-turn monologues.
   opener: (spec: JobSpec) =>
     `Hi, I'm calling to get a quote for a move on ${spokenDate(spec.preferredDate)}: a ${

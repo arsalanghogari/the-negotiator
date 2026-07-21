@@ -43,3 +43,8 @@ next-env.d.ts
 .data/
 .env
 BUILD_LOG.md
+
+# local media (demo footage/renders/narration — too big for git)
+demo-raw.mov
+demo-video*
+narration/

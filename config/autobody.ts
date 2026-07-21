@@ -27,6 +27,10 @@ export const autobody = {
   opener: (spec: JobSpec) =>
     `Hi, I'm calling to get a repair estimate for a ${spec.vehicle}: ${spec.damageDescription}. Could you help me with that?`,
 
+  // Live discovery searches where the car is.
+  discoveryQuery: (spec: JobSpec) =>
+    `auto body shops near ${spec.origin.city}${spec.origin.zip ? `, ${spec.origin.zip}` : ''}`,
+
   // REAL San Jose shops from actual directory listings (Yelp/Carwise/TrustAnalytica,
   // fetched 2026-07-19); missing ratings/phones stay blank rather than invented.
   // Demo mode never dials them — the negotiator calls fictional stand-in personas so no

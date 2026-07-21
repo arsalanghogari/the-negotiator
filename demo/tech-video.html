@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Parley — Tech Video (60s)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #0b1a24; --slate: #12303f; --signal: #c6f04d; --signal-deep: #a9d633;
+    --cloud: #edf2f3; --muted: #8fa3ad; --line: #24424f; --amber: #f5a524; --red: #e5484d;
+  }
+  * { margin: 0; box-sizing: border-box; }
+  html, body { height: 100%; background: var(--ink); color: var(--cloud);
+    font-family: Inter, sans-serif; overflow: hidden; }
+  .display { font-family: "Space Grotesk", sans-serif; letter-spacing: -0.03em; }
+  .mono { font-family: "JetBrains Mono", monospace; }
+
+  .slide { position: absolute; inset: 0; padding: 6vh 7vw; display: flex;
+    flex-direction: column; justify-content: center; opacity: 0;
+    transform: translateY(14px); transition: opacity .55s ease, transform .55s ease;
+    pointer-events: none; }
+  .slide.on { opacity: 1; transform: none; }
+
+  .kicker { color: var(--signal); font-weight: 600; text-transform: uppercase;
+    letter-spacing: .18em; font-size: 1.5vh; margin-bottom: 1.6vh; }
+  h1 { font-size: 6.2vh; font-weight: 700; line-height: 1.08; margin-bottom: 3.5vh; }
+  h1 .lime { color: var(--signal); }
+
+  .row { display: flex; gap: 1.4vw; align-items: stretch; }
+  .card { background: var(--slate); border: 1px solid var(--line); border-radius: 14px;
+    padding: 2.6vh 1.6vw; flex: 1; }
+  .card h3 { font-size: 2.3vh; margin-bottom: .8vh; }
+  .card p { font-size: 1.8vh; color: var(--muted); line-height: 1.45; }
+  .tag { display: inline-block; background: rgba(198,240,77,.12); color: var(--signal);
+    border-radius: 6px; padding: .3vh .6vw; font-size: 1.6vh; font-weight: 600; }
+
+  .pipe { display: flex; align-items: center; gap: 1vw; margin-top: 1vh; }
+  .pipe .step { background: var(--slate); border: 1px solid var(--line); border-radius: 12px;
+    padding: 2.2vh 1.8vw; font-size: 2.4vh; font-weight: 600; }
+  .pipe .arrow { color: var(--signal); font-size: 3vh; }
+
+  .code { background: #071219; border: 1px solid var(--line); border-radius: 12px;
+    padding: 2.2vh 1.4vw; font-size: 1.85vh; line-height: 1.7; white-space: pre; overflow: hidden; }
+  .code .c { color: #4e6b78; } .code .g { color: var(--signal); } .code .a { color: var(--amber); }
+  .code .r { color: var(--red); } .code .b { color: #6aa9ff; }
+
+  .vs { display: flex; align-items: center; justify-content: center; font-size: 4vh;
+    color: var(--signal); padding: 0 1vw; }
+
+  #hud { position: fixed; left: 0; right: 0; bottom: 0; height: 5px; background: var(--slate); }
+  #bar { height: 100%; width: 0; background: var(--signal); }
+  #brand { position: fixed; top: 3.2vh; left: 3.4vw; display: flex; gap: .7vw; align-items: center; }
+  #brand .dot { width: 1.7vh; height: 1.7vh; border-radius: 50%; background: var(--signal); }
+  #brand span { font-weight: 700; font-size: 2.2vh; }
+
+  #gate { position: fixed; inset: 0; background: var(--ink); display: flex; flex-direction: column;
+    gap: 3vh; align-items: center; justify-content: center; z-index: 10; cursor: pointer; }
+  #gate button { background: var(--signal); color: var(--ink); border: 0; border-radius: 999px;
+    font: 700 2.6vh "Space Grotesk", sans-serif; padding: 2.2vh 4vw; cursor: pointer; }
+  #gate p { color: var(--muted); font-size: 1.8vh; }
+</style>
+</head>
+<body>
+
+<div id="brand" class="display"><div class="dot"></div><span>Parley</span></div>
+
+<!-- 1 · Stack + pipeline -->
+<section class="slide" data-t="0">
+  <div class="kicker">The stack</div>
+  <h1 class="display">Next.js on Netlify, <span class="lime">Supabase</span> behind it.<br>One pipeline.</h1>
+  <div class="pipe display">
+    <div class="step">🎙 Intake</div><div class="arrow">→</div>
+    <div class="step">📞 Calls</div><div class="arrow">→</div>
+    <div class="step">🧾 Extraction</div><div class="arrow">→</div>
+    <div class="step">🏆 Report</div>
+  </div>
+</section>
+
+<!-- 2 · Two providers, sequential leverage -->
+<section class="slide" data-t="6.5">
+  <div class="kicker">Architecture</div>
+  <h1 class="display">Two model providers, <span class="lime">different jobs.</span></h1>
+  <div class="row">
+    <div class="card">
+      <h3 class="display">🗣 ElevenLabs voice agent</h3>
+      <p>The negotiator — live voice with mid-call tools:</p>
+      <p class="mono" style="margin-top:1vh"><span class="tag">get_best_competing_quote</span>&nbsp;<span class="tag">log_quote</span></p>
+    </div>
+    <div class="vs">⇄</div>
+    <div class="card">
+      <h3 class="display">🤖 GPT-4o seller personas</h3>
+      <p>Hidden pricing policies — lowballer, stonewaller, upseller, tough. Negotiations are contingent, never scripted.</p>
+    </div>
+  </div>
+  <div class="pipe display" style="margin-top:3.5vh">
+    <div class="step">Call 1</div><div class="arrow">— quote arms →</div>
+    <div class="step">Call 2</div><div class="arrow">— leverage →</div>
+    <div class="step">Call 3…</div>
+  </div>
+</section>
+
+<!-- 3 · Deterministic core -->
+<section class="slide" data-t="23">
+  <div class="kicker">Implementation</div>
+  <h1 class="display">Deterministic <span class="lime">code</span>, not model judgment.</h1>
+  <div class="code mono"><span class="c">// lib/quote-rules.ts</span>
+<span class="b">quote</span>  = extract(transcript, <span class="g">STRICT_JSON_SCHEMA</span>)
+<span class="a">flag</span>   = total &lt; 0.7 × market_median   <span class="c">// $2,400 — moveBuddha data</span>
+<span class="r">tripwire</span>: every spoken amount parsed live —
+          cite a quote that doesn't exist → <span class="r">corrected mid-call</span></div>
+</section>
+
+<!-- 4 · Verticals are config -->
+<section class="slide" data-t="39">
+  <div class="kicker">Extensibility</div>
+  <h1 class="display">Verticals are <span class="lime">config, not code.</span></h1>
+  <div class="row">
+    <div class="card"><h3 class="mono">config/moving.ts</h3><p>Movers · $2,400 median · moving personas</p></div>
+    <div class="vs display">→</div>
+    <div class="card" style="border-color:var(--signal)"><h3 class="mono">config/autobody.ts</h3><p>Real body shops · repair benchmarks · new personas</p></div>
+  </div>
+  <p class="mono" style="margin-top:3vh; color:var(--signal); font-size:2vh">$ NEXT_PUBLIC_VERTICAL=autobody npm run dev</p>
+</section>
+
+<!-- 5 · Close -->
+<section class="slide" data-t="46.5">
+  <div class="kicker">Grounded + audited</div>
+  <h1 class="display">Live Google Places discovery.<br>Every quote <span class="lime">audited.</span></h1>
+  <p class="mono" style="color:var(--muted); font-size:2vh">$ npm run check&nbsp;&nbsp;<span style="color:var(--signal)">✓ 4/4 calls · quotes match deterministic rules</span></p>
+  <h1 class="display" style="margin-top:5vh; font-size:4.6vh">Software that can finally pick up the phone —<br><span class="lime">and prove what it heard.</span></h1>
+</section>
+
+<div id="hud"><div id="bar"></div></div>
+
+<div id="gate">
+  <button id="play" class="display">▶ Play (58s)</button>
+  <p>Start your screen recording, then press play. Press R to restart.</p>
+</div>
+
+<audio id="vo" src="../narration/tech-video.mp3" preload="auto"></audio>
+
+<script>
+  const vo = document.getElementById('vo');
+  const slides = [...document.querySelectorAll('.slide')];
+  const bar = document.getElementById('bar');
+  document.getElementById('play').onclick = () => {
+    document.getElementById('gate').style.display = 'none';
+    document.documentElement.requestFullscreen?.().catch(() => {});
+    vo.currentTime = 0; vo.play();
+  };
+  addEventListener('keydown', e => { if (e.key === 'r' || e.key === 'R') location.reload(); });
+  // slides sync to audio clock, so buffering can't drift them
+  setInterval(() => {
+    const t = vo.ended ? Infinity : vo.currentTime;
+    const idx = slides.findLastIndex(s => t >= +s.dataset.t);
+    slides.forEach((s, i) => s.classList.toggle('on', i === idx));
+    bar.style.width = (t / (vo.duration || 58) * 100) + '%';
+  }, 100);
+</script>
+</body>
+</html>

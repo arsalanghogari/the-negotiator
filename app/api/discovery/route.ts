@@ -1,13 +1,18 @@
 import { vertical } from '@/config/vertical';
+import { readAll } from '@/lib/store';
+import type { JobSpec } from '@/types';
 
 export const maxDuration = 15;
 
 // Live business discovery via Google Places Text Search (New): the call list fetched
-// programmatically, per the brief. Falls back to the baked directory snapshot in config
-// when no key is set or the request fails — a quota hiccup can never break the demo.
+// programmatically, per the brief — searched around the ACTIVE job's origin, not a fixed
+// city. Falls back to the baked directory snapshot in config when no key is set or the
+// request fails — a quota hiccup can never break the demo.
 export async function GET() {
   const key = process.env.GOOGLE_PLACES_API_KEY || process.env.GOOGLE_MAPS_API_KEY;
   const { discovery } = vertical;
+  const spec = (await readAll<JobSpec>('jobspecs')).filter((s) => s.confirmedByUser).at(-1);
+  const query = spec ? vertical.discoveryQuery(spec) : discovery.query;
   if (key) {
     try {
       const res = await fetch('https://places.googleapis.com/v1/places:searchText', {
@@ -18,7 +23,7 @@ export async function GET() {
           'X-Goog-FieldMask':
             'places.displayName,places.rating,places.userRatingCount,places.nationalPhoneNumber',
         },
-        body: JSON.stringify({ textQuery: discovery.query, maxResultCount: 8 }),
+        body: JSON.stringify({ textQuery: query, maxResultCount: 8 }),
       });
       if (!res.ok) throw new Error(`places ${res.status}`);
       const j = (await res.json()) as {
@@ -38,7 +43,7 @@ export async function GET() {
           phone: p.nationalPhoneNumber,
         }));
       if (candidates.length) {
-        return Response.json({ source: 'Google Places', query: discovery.query, candidates, live: true });
+        return Response.json({ source: 'Google Places', query, candidates, live: true });
       }
     } catch {
       // fall through to the snapshot
