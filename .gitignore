@@ -48,3 +48,8 @@ BUILD_LOG.md
 demo-raw.mov
 demo-video*
 narration/
+parley-deck.*
+team-video*
+tech-video*
+*.mp4
+*.mov
