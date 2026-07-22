@@ -1,16 +1,19 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 
-// Storage seam (spec §2): Supabase when SUPABASE_URL/SUPABASE_ANON_KEY are set
-// (required on Netlify — serverless FS is read-only), local JSON files otherwise.
+// Storage seam (spec §2): Supabase when SUPABASE_URL and a key are set (required on
+// Netlify — serverless FS is read-only), local JSON files otherwise.
 // One table holds everything: collections(name text primary key, items jsonb).
+// Access is server-only: prefer SUPABASE_SERVICE_ROLE_KEY (bypasses RLS) so RLS can be
+// enabled on the table with ZERO policies — locking the anon key out entirely.
 
 const DATA_DIR = path.join(process.cwd(), '.data');
-const useSupabase = !!(process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY);
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+const useSupabase = !!(process.env.SUPABASE_URL && supabaseKey);
 
 async function supabase() {
   const { createClient } = await import('@supabase/supabase-js');
-  return createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!);
+  return createClient(process.env.SUPABASE_URL!, supabaseKey!);
 }
 
 function fileFor(collection: string) {
