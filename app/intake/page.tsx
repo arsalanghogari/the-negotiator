@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ConversationProvider, useConversation } from '@elevenlabs/react';
 import { useSpeechGate } from '@/lib/use-speech-gate';
 import { stripDirections } from '@/lib/utils';
+import { vertical } from '@/config/vertical';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,7 +15,7 @@ import type { JobSpec } from '@/types';
 
 const empty: JobSpec = {
   jobId: '',
-  vertical: 'moving',
+  vertical: vertical.name,
   origin: { city: '', zip: '', floor: 1, hasElevator: false },
   destination: { city: '', zip: '', floor: 1, hasElevator: false },
   distanceMiles: 0,
@@ -102,8 +103,8 @@ export default function IntakePage() {
       <div className="space-y-1.5">
         <h1 className="text-3xl font-bold tracking-tight">Job intake</h1>
         <p className="max-w-2xl text-muted-foreground">
-          Start with the voice interview — it builds the job spec Parley reads to every mover it
-          calls.
+          Start with the voice interview — it builds the job spec Parley reads to every{' '}
+          {vertical.counterpartyPlural.replace(/s$/, '')} it calls.
         </p>
       </div>
 
@@ -155,6 +156,35 @@ export default function IntakePage() {
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
+          {vertical.intakeFields ? (
+            <>
+              {vertical.intakeFields.map((f) => (
+                <div key={f.key} className="space-y-1">
+                  <Label>{f.label}</Label>
+                  <Input
+                    placeholder={f.placeholder}
+                    value={spec[f.key] ?? ''}
+                    onChange={(e) => set({ [f.key]: e.target.value })}
+                  />
+                </div>
+              ))}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label>City (where the car is)</Label>
+                  <Input value={spec.origin.city} onChange={(e) => set({ origin: { ...spec.origin, city: e.target.value } })} />
+                </div>
+                <div className="space-y-1">
+                  <Label>Zip</Label>
+                  <Input value={spec.origin.zip} onChange={(e) => set({ origin: { ...spec.origin, zip: e.target.value } })} />
+                </div>
+                <div className="space-y-1">
+                  <Label>Preferred drop-off date</Label>
+                  <Input type="date" value={spec.preferredDate} onChange={(e) => set({ preferredDate: e.target.value })} />
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
           {(['origin', 'destination'] as const).map((k) => (
             <fieldset key={k} className="grid grid-cols-2 items-end gap-3">
               <div className="space-y-1">
@@ -223,6 +253,8 @@ export default function IntakePage() {
               <Checkbox checked={spec.packingService} onCheckedChange={(v) => set({ packingService: v === true })} /> Packing service
             </label>
           </div>
+          </>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
@@ -277,6 +309,11 @@ function VoiceIntakeInner({ demo, onSpec }: { demo: boolean; onSpec: (spec: Part
   };
   const conversation = useConversation({
     micMuted: demo, // demo: a synthetic customer answers as text; no human mic
+    // Non-moving verticals steer the platform intake agent per-session — the agent's
+    // stored prompt stays moving-flavored and untouched.
+    onConnect: () => {
+      if (vertical.intakeInterview) conversation.sendContextualUpdate(vertical.intakeInterview);
+    },
     clientTools: {
       // The intake agent calls this after the user confirms the spec verbally.
       save_job_spec: (params: { job_spec_json: string }) => {

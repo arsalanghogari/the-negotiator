@@ -31,6 +31,19 @@ export const autobody = {
   discoveryQuery: (spec: JobSpec) =>
     `auto body shops near ${spec.origin.city}${spec.origin.zip ? `, ${spec.origin.zip}` : ''}`,
 
+  // Vertical-specific intake: these replace the moving-shaped form fields, and the
+  // interview override is injected into the voice session at connect (the platform
+  // agent prompt stays untouched).
+  intakeFields: [
+    { key: 'vehicle' as const, label: 'Vehicle (year, make, model)', placeholder: '2019 Honda Civic' },
+    {
+      key: 'damageDescription' as const,
+      label: 'Damage description',
+      placeholder: 'rear-ended: bumper cover needs replacement, cracked left taillight',
+    },
+  ] as null | { key: 'vehicle' | 'damageDescription'; label: string; placeholder: string }[],
+  intakeInterview: `VERTICAL OVERRIDE — this interview is for AUTO BODY REPAIR, not moving. Collect, one question at a time: the vehicle (year, make, model); what happened and the visible damage (panels, lights, drivability); the city and zip code where the car is; the preferred drop-off date; any notes (insurance claim or out of pocket); then the customer's name and email. Do NOT ask about home size, boxes, stairs, or anything moving-related. When you read the spec back and the customer confirms, call save_job_spec with JSON keys: vehicle, damageDescription, origin {city, zip}, preferredDate, specialNotes, customerName, contactEmail.` as null | string,
+
   // REAL San Jose shops from actual directory listings (Yelp/Carwise/TrustAnalytica,
   // fetched 2026-07-19); missing ratings/phones stay blank rather than invented.
   // Demo mode never dials them — the negotiator calls fictional stand-in personas so no

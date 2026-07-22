@@ -28,6 +28,10 @@ export const moving = {
   discoveryQuery: (spec: JobSpec) =>
     `moving companies near ${spec.origin.city}${spec.origin.zip ? `, ${spec.origin.zip}` : ''}`,
 
+  // Moving uses the full bespoke intake form and the platform-configured interview.
+  intakeFields: null as null | { key: 'vehicle' | 'damageDescription'; label: string; placeholder: string }[],
+  intakeInterview: null as null | string,
+
   // Deterministic first line: identical job intro on every call, no first-turn monologues.
   opener: (spec: JobSpec) =>
     `Hi, I'm calling to get a quote for a move on ${spokenDate(spec.preferredDate)}: a ${
