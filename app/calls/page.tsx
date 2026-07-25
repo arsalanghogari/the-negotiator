@@ -20,6 +20,23 @@ type Discovery = {
   live: boolean;
 };
 
+// Real outbound phone calls — gated behind NEXT_PUBLIC_LIVE_CALLS (and the server's own
+// LIVE_CALLS_ENABLED), each behind an explicit confirmation.
+const LIVE_CALLS = process.env.NEXT_PUBLIC_LIVE_CALLS === '1';
+
+type LiveCall = {
+  conversationId: string;
+  providerName: string;
+  status: string;
+  turns?: TranscriptTurn[];
+  quote?: Quote | null;
+};
+
+const toE164 = (phone: string) => {
+  const d = phone.replace(/\D/g, '');
+  return d.length === 10 ? `+1${d}` : d.startsWith('1') && d.length === 11 ? `+${d}` : `+${d}`;
+};
+
 type CallState = {
   status: 'idle' | 'calling' | 'extracting' | 'done';
   turns: TranscriptTurn[];
@@ -292,6 +309,44 @@ export default function CallsPage() {
   // Baked snapshot renders instantly; the live Google Places result replaces it when a
   // key is configured server-side.
   const [discovery, setDiscovery] = useState<Discovery>({ ...vertical.discovery, live: false });
+  const [liveCalls, setLiveCalls] = useState<LiveCall[]>([]);
+
+  function updateLiveCall(id: string, patch: Partial<LiveCall>) {
+    setLiveCalls((v) => v.map((c) => (c.conversationId === id ? { ...c, ...patch } : c)));
+  }
+
+  async function pollLiveCall(id: string, providerName: string) {
+    try {
+      const res = await fetch(`/api/live-call?id=${id}&provider=${encodeURIComponent(providerName)}`);
+      const j = await res.json();
+      if (j.status === 'done' || j.status === 'failed') {
+        updateLiveCall(id, { status: j.status, turns: j.turns, quote: j.quote });
+        return;
+      }
+      updateLiveCall(id, { status: j.status ?? 'in progress' });
+      setTimeout(() => pollLiveCall(id, providerName), 5000);
+    } catch {
+      setTimeout(() => pollLiveCall(id, providerName), 8000);
+    }
+  }
+
+  async function startLiveCall(c: { name: string; phone?: string }) {
+    if (!c.phone) return;
+    const ok = window.confirm(
+      `Place a REAL phone call to ${c.name} at ${c.phone}?\n\nParley will open by disclosing it is an AI calling on behalf of a customer and that the call may be recorded. Only call businesses you genuinely want a quote from.`
+    );
+    if (!ok) return;
+    setError('');
+    const res = await fetch('/api/live-call', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ toNumber: toE164(c.phone), providerName: c.name }),
+    });
+    const j = await res.json();
+    if (!res.ok) return setError(j.error ?? `HTTP ${res.status}`);
+    setLiveCalls((v) => [...v, { conversationId: j.conversationId, providerName: c.name, status: 'dialing' }]);
+    setTimeout(() => pollLiveCall(j.conversationId, c.name), 8000);
+  }
   useEffect(() => {
     fetch('/api/discovery')
       .then((r) => r.json())
@@ -440,6 +495,47 @@ export default function CallsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {liveCalls.length > 0 && (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          {liveCalls.map((lc) => (
+            <Card key={lc.conversationId} className="border-signal-deep">
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between text-base">
+                  <span>📞 {lc.providerName} — live</span>
+                  <Badge className="gap-1.5 bg-signal/20 font-mono text-xs text-foreground">
+                    {lc.status !== 'done' && lc.status !== 'failed' && (
+                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-signal-deep" />
+                    )}
+                    {lc.status}
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {lc.turns && lc.turns.length > 0 && (
+                  <div className="max-h-64 space-y-2 overflow-y-auto rounded-md border p-3 text-xs">
+                    {lc.turns.map((t, i) => (
+                      <p key={i}>
+                        <span className={t.speaker === 'negotiator' ? 'font-semibold text-signal-deep' : 'font-semibold'}>
+                          {t.speaker === 'negotiator' ? 'Parley' : lc.providerName}:
+                        </span>{' '}
+                        {t.text}
+                      </p>
+                    ))}
+                  </div>
+                )}
+                {lc.quote && (
+                  <p className="font-mono text-sm font-medium">
+                    {lc.quote.callOutcome === 'quoted'
+                      ? `$${lc.quote.totalPrice.toLocaleString()}${lc.quote.binding ? ' (binding)' : ''}`
+                      : `outcome: ${lc.quote.callOutcome}`}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
       <ConversationProvider>
         <ShowcaseCall

@@ -175,7 +175,9 @@ export async function extractQuote(transcript: Transcript): Promise<Quote> {
   return {
     ...ex,
     itemizationMismatch: mismatch,
-    quoteId: `q-${transcript.jobId}-${transcript.persona}`,
+    // Derived from the transcript id (same value as before for sim personas) so live
+    // calls — many per job, all persona 'live' — get unique quote ids per provider.
+    quoteId: `q-${transcript.transcriptId.slice(3)}`,
     providerName: transcript.providerName,
     persona: transcript.persona,
     transcriptRef: transcript.transcriptId,

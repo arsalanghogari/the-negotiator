@@ -1,5 +1,5 @@
 export type HomeSize = 'studio' | '1br' | '2br' | '3br+';
-export type Persona = 'tough' | 'lowballer' | 'upseller' | 'stonewaller';
+export type Persona = 'tough' | 'lowballer' | 'upseller' | 'stonewaller' | 'live';
 export type CallOutcome = 'quoted' | 'callback' | 'declined';
 
 export interface JobSpec {
