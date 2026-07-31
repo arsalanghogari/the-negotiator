@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import { vertical } from '@/config/vertical';
-import { itemizationMismatch } from '@/lib/quote-rules';
+import { bindingConfirmed, itemizationMismatch } from '@/lib/quote-rules';
+import type { MarketResearch } from '@/lib/research';
 import type { JobSpec, Quote, Transcript, TranscriptTurn } from '@/types';
 
 const openai = new OpenAI();
@@ -27,6 +28,7 @@ export async function runCall(
   spec: JobSpec,
   seller: SellerCfg,
   bestCompetingQuote: Quote | null,
+  research: MarketResearch | null,
   onTurn: (turn: TranscriptTurn) => void
 ): Promise<Transcript> {
   const best = bestCompetingQuote
@@ -36,8 +38,16 @@ export async function runCall(
         binding: bestCompetingQuote.binding,
       })
     : null;
+  const marketRate = research
+    ? JSON.stringify({
+        typicalLow: research.typicalLow,
+        typicalHigh: research.typicalHigh,
+        median: research.median,
+        source: research.source,
+      })
+    : null;
   // specForCall: the vertical decides which spec fields the agents see.
-  const negotiatorSystem = vertical.negotiatorPrompt(JSON.stringify(vertical.specForCall(spec)), best);
+  const negotiatorSystem = vertical.negotiatorPrompt(JSON.stringify(vertical.specForCall(spec)), best, marketRate);
   // Deterministic opener: identical job intro on every call, and no first-turn monologues.
   const opener: TranscriptTurn = { speaker: 'negotiator', text: vertical.opener(spec) };
   const turns: TranscriptTurn[] = [opener];
@@ -168,6 +178,11 @@ export async function extractQuote(transcript: Transcript): Promise<Quote> {
   // Deterministic guards: these rules are code, not model judgment.
   // A negotiated price means the final total IS the negotiated price.
   if (ex.negotiated && ex.priceAfter != null) ex.totalPrice = ex.priceAfter;
+
+  // binding=true feeds the leverage chain, so a seller saying "consider it binding"
+  // (or extraction judgment alone) can't set it — the negotiator must have restated
+  // the binding total on the call.
+  if (ex.binding && !bindingConfirmed(transcript.turns, ex.totalPrice)) ex.binding = false;
 
   const mismatch = itemizationMismatch(ex);
   const threshold = vertical.marketMedian * (1 - vertical.redFlagBelowMedianPct);

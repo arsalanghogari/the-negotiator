@@ -33,6 +33,31 @@ export function citedAmount(text: string): number | null {
   return wordsToNumber(tail.toLowerCase().replace(/[,–—-]/g, ' ').split(/\s+/).filter(Boolean));
 }
 
+// Every dollar amount stated anywhere in a turn — digits ("$2,150") or spoken words
+// ("two thousand dollars"). Word parsing also yields partial sums; that only ever adds
+// extra candidates, and membership still requires the exact total.
+function amountsIn(text: string): Set<number> {
+  const out = new Set<number>();
+  for (const m of text.replace(/(\d),(?=\d)/g, '$1').matchAll(/\d+/g)) out.add(Number(m[0]));
+  const words = text.toLowerCase().replace(/[,–—-]/g, ' ').split(/\s+/).filter(Boolean);
+  for (let i = 0; i < words.length; i++) {
+    if (!(words[i] in UNITS || words[i] in TENS)) continue;
+    const n = wordsToNumber(words.slice(i));
+    if (n != null && n > 0) out.add(n);
+  }
+  return out;
+}
+
+// Binding is what arms the leverage chain, so extraction's say-so (or a seller's) is not
+// enough: it stands only if the NEGOTIATOR restated it on the call with the exact total
+// ("So to confirm: $2,150 binding — correct?"), which its prompt requires before accepting.
+export function bindingConfirmed(turns: { speaker: string; text: string }[], total: number): boolean {
+  return (
+    total > 0 &&
+    turns.some((t) => t.speaker === 'negotiator' && /binding/i.test(t.text) && amountsIn(t.text).has(total))
+  );
+}
+
 // Every dollar amount that legitimately exists for a job's quotes — the only numbers
 // the negotiator may ever cite as competing quotes.
 export function knownAmounts(quotes: Quote[]): Set<number> {

@@ -1,4 +1,5 @@
 import { runCall, extractQuote } from '@/lib/calls';
+import { researchMarketRate } from '@/lib/research';
 import { readAll, upsert, writeAll } from '@/lib/store';
 import { vertical } from '@/config/vertical';
 import type { JobSpec, Quote, Report, Transcript } from '@/types';
@@ -29,10 +30,16 @@ export async function POST(req: Request) {
     async start(controller) {
       const emit = (o: object) => controller.enqueue(encoder.encode(JSON.stringify(o) + '\n'));
       try {
+        // Anchor leverage for call #1: web-searched market rate for this exact job.
+        // null on failure — the run proceeds exactly as before, without it.
+        emit({ type: 'status', status: 'researching' });
+        const research = await researchMarketRate(spec);
+        if (research) await upsert('research', 'jobId', research as unknown as Record<string, unknown>);
+
         let best: Quote | null = null;
         for (const seller of sellers) {
           emit({ type: 'status', persona: seller.persona, status: 'calling' });
-          const transcript = await runCall(spec, seller, best, (turn) =>
+          const transcript = await runCall(spec, seller, best, research, (turn) =>
             emit({ type: 'turn', persona: seller.persona, ...turn })
           );
           await upsert('transcripts', 'transcriptId', transcript as unknown as Record<string, unknown>);

@@ -3,7 +3,7 @@
 import { readAll } from '../lib/store.ts';
 import { moving } from '../config/moving.ts';
 import { autobody } from '../config/autobody.ts';
-import { itemizationMismatch } from '../lib/quote-rules.ts';
+import { bindingConfirmed, itemizationMismatch } from '../lib/quote-rules.ts';
 import type { JobSpec, Quote, Transcript } from '../types.ts';
 
 const quotes = await readAll<Quote>('quotes');
@@ -54,6 +54,15 @@ for (const t of transcripts.filter((t) => backing.has(t.transcriptId))) {
         errors.push(`${t.transcriptId}: negotiator cited $${amount} — no such quote exists for ${t.jobId}`);
     }
   }
+}
+
+// 3. Binding is leverage: every stored binding=true must be backed by the negotiator's
+// on-call confirm-restate of that exact total — never extraction (or seller) say-so alone.
+const txById = new Map(transcripts.map((t) => [t.transcriptId, t]));
+for (const q of quotes.filter((q) => q.binding)) {
+  const t = txById.get(q.transcriptRef);
+  if (!t || !bindingConfirmed(t.turns, q.totalPrice))
+    errors.push(`${q.quoteId}: binding=true but no negotiator confirm-restate of $${q.totalPrice} in ${q.transcriptRef}`);
 }
 
 if (quotes.length === 0) errors.push('no quotes in store — run the calls first');
