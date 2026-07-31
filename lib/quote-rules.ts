@@ -58,6 +58,16 @@ export function bindingConfirmed(turns: { speaker: string; text: string }[], tot
   );
 }
 
+// Researched market figures are legitimately citable ("from another company I found out
+// this runs about $X") — they ARE other companies' published prices. The tripwire must
+// not punish honest leverage; binding claims remain corroborated-quotes-only.
+// Structural type (not MarketResearch) so scripts/check.ts keeps plain-node imports.
+export function researchAmounts(
+  r: { typicalLow: number; typicalHigh: number; median: number } | null | undefined
+): number[] {
+  return r ? [r.typicalLow, r.median, r.typicalHigh] : [];
+}
+
 // Every dollar amount that legitimately exists for a job's quotes — the only numbers
 // the negotiator may ever cite as competing quotes.
 export function knownAmounts(quotes: Quote[]): Set<number> {

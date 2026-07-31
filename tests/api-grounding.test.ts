@@ -169,6 +169,28 @@ describe('/api/seller-reply — the anti-bluff tripwire', () => {
     ]);
     expect(j.violation).toBeNull();
   });
+
+  test('citing a researched market figure ("from another company I found") → no violation', async () => {
+    storeData.collections.research = [
+      { jobId: 'job-A', typicalLow: 1800, typicalHigh: 3200, median: 2400, source: 'web' },
+    ];
+    const j = await post([
+      { speaker: 'seller', text: 'Our price is $2,900.' },
+      { speaker: 'negotiator', text: 'From another company I found an offer of $1,800 for this exact move. Can you get closer?' },
+    ]);
+    expect(j.violation).toBeNull();
+  });
+
+  test('a number matching NO quote and NO research is still a phantom', async () => {
+    storeData.collections.research = [
+      { jobId: 'job-A', typicalLow: 1800, typicalHigh: 3200, median: 2400, source: 'web' },
+    ];
+    const j = await post([
+      { speaker: 'seller', text: 'Our price is $2,900.' },
+      { speaker: 'negotiator', text: 'I have a quote of $1,200 from another mover. Can you beat it?' },
+    ]);
+    expect(j.violation).toBe(1200);
+  });
 });
 
 describe('/api/live-call — the safety gate holds', () => {

@@ -1,6 +1,6 @@
 import { showcaseSellerReply } from '@/lib/calls';
 import { activeJobData } from '@/lib/job-data';
-import { citedAmount, knownAmounts } from '@/lib/quote-rules';
+import { citedAmount, knownAmounts, researchAmounts } from '@/lib/quote-rules';
 import type { TranscriptTurn } from '@/types';
 
 export const maxDuration = 30;
@@ -22,6 +22,9 @@ export async function POST(req: Request) {
     const job = await activeJobData();
     if (job) {
       const allowed = knownAmounts(job.quotes);
+      // Researched market figures are honest leverage ("from another company I found
+      // out…") — citing them is not a phantom quote.
+      for (const n of researchAmounts(job.research)) allowed.add(n);
       // Amounts the seller has stated in THIS call are fair to repeat back (they aren't
       // extracted into the store until the call saves).
       for (const t of turns) {

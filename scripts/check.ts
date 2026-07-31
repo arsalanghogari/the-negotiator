@@ -3,7 +3,8 @@
 import { readAll } from '../lib/store.ts';
 import { moving } from '../config/moving.ts';
 import { autobody } from '../config/autobody.ts';
-import { bindingConfirmed, itemizationMismatch } from '../lib/quote-rules.ts';
+import { bindingConfirmed, itemizationMismatch, researchAmounts } from '../lib/quote-rules.ts';
+import type { MarketResearch } from '../lib/research.ts';
 import type { JobSpec, Quote, Transcript } from '../types.ts';
 
 const quotes = await readAll<Quote>('quotes');
@@ -33,7 +34,8 @@ for (const q of quotes) {
 }
 
 // 2. Honesty: every "binding quote for $X" the negotiator cites must exist among the
-// SAME JOB's quotes — an amount from another job in the store is still a lie on this call.
+// SAME JOB's quotes or its researched market figures — an amount from another job in
+// the store is still a lie on this call.
 const amountsByJob = new Map<string, Set<number>>();
 for (const q of quotes) {
   const job = jobOf.get(q.transcriptRef);
@@ -41,6 +43,11 @@ for (const q of quotes) {
   const set = amountsByJob.get(job) ?? new Set<number>();
   for (const n of [q.totalPrice, q.priceBefore, q.priceAfter]) if (n != null) set.add(n);
   amountsByJob.set(job, set);
+}
+for (const r of await readAll<MarketResearch>('research')) {
+  const set = amountsByJob.get(r.jobId) ?? new Set<number>();
+  for (const n of researchAmounts(r)) set.add(n);
+  amountsByJob.set(r.jobId, set);
 }
 const cite = /binding quote (?:for|of) \$?([\d,]+)/i;
 const backing = new Set(quotes.map((q) => q.transcriptRef));

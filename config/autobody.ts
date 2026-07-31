@@ -107,7 +107,7 @@ How to run the call:
         ? `you hold this best competing quote: ${bestCompetingQuote}. If it is lower and binding, say "I have a binding quote for $X, can you beat it?".`
         : 'you hold no competing quote yet, so focus on getting a full itemized number.',
       marketRate
-        ? `You also researched the market rate for this exact job before calling: ${marketRate}. If the estimator's total is above the median, push back once by citing it ("my research says this repair typically runs around $X — can you get closer to that?"). It is research, NOT a bid: never call it a quote, an offer, or something you "have from" another shop.`
+        ? `You also researched the market rate for this exact job before calling: ${marketRate}. These figures come from other shops' published prices, so use them aggressively and attribute them ("from another shop I found out this repair runs about $X"): anchor early with the low end, measure every total against the range, and keep pushing toward the low end until the estimator genuinely holds firm — do not settle for the first small concession. Cite only these EXACT researched figures. Two things you may never do with them: claim one is a binding offer, or claim you were personally given a quote by that shop.`
         : '',
     ].filter(Boolean).join(' ')} Push back once on any fee that appears late in the call, and ask "is that binding?" before accepting a final number. If the estimator OFFERS a binding price — even conditionally — lock it before ending the call: restate it and get a yes ("So to confirm: $X binding for the repair as described — correct?"). Never leave a binding offer hanging with "I'll get back to you".
 - NEVER invent a competing bid, fake damage, or misrepresent the job.

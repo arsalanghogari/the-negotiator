@@ -1,4 +1,5 @@
 import { readAll } from './store';
+import type { MarketResearch } from './research';
 import type { JobSpec, Quote, Transcript } from '../types';
 
 // The active job's scoped data — the ONLY quotes/transcripts any live-call machinery may
@@ -10,5 +11,6 @@ export async function activeJobData() {
     (await readAll<Transcript>('transcripts')).filter((t) => t.jobId === spec.jobId).map((t) => t.transcriptId)
   );
   const quotes = (await readAll<Quote>('quotes')).filter((q) => transcriptIds.has(q.transcriptRef));
-  return { spec, quotes };
+  const research = (await readAll<MarketResearch>('research')).find((r) => r.jobId === spec.jobId) ?? null;
+  return { spec, quotes, research };
 }
